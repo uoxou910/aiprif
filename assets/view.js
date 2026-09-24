@@ -2,7 +2,13 @@ const C=window.FRECA_CONFIG||{};
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 let cards=[],q='',chara='',page=1;
-const PAGE=30;
+const PAGE=20;
+
+function thumbUrl(url){
+  const s=String(url||'');
+  const id=s.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1] || s.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)?.[1];
+  return id ? 'https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w480' : s;
+}
 
 function normalizeSearchText(s){
   return String(s??'')
@@ -13,16 +19,35 @@ function normalizeSearchText(s){
     );
 }
 
+const CACHE_KEY='freca_A_public_cards_v2';
 async function load(){
-  document.body.innerHTML='<div class="loading">読み込み中...</div>';
+  let shown=false;
   try{
-    const r=await fetch(C.gasUrl+'?action=list');
+    const saved=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');
+    if(saved && Array.isArray(saved.cards)){
+      cards=saved.cards;
+      buildShell();renderResults();shown=true;
+    }
+  }catch(e){console.warn('cache read',e);}
+  if(!shown)document.body.innerHTML='<div class="loading">読み込み中...</div>';
+  try{
+    const r=await fetch(C.gasUrl+'?action=list&_ts='+Date.now(),{cache:'no-store'});
     const j=await r.json();
-    cards=Array.isArray(j)?j:(j.cards||[]);
-    buildShell();
-    renderResults();
+    if(j.ok===false)throw new Error(j.error||'API error');
+    const fresh=Array.isArray(j)?j:(j.cards||[]);
+    if(!Array.isArray(fresh))throw new Error('Invalid card list');
+    cards=fresh;
+    try{localStorage.setItem(CACHE_KEY,JSON.stringify({cards:fresh}));}catch(e){console.warn('cache write',e);}
+    if(!shown){buildShell();renderResults();}
+    else{
+      const oldQ=q,oldChara=chara,oldPage=page;
+      buildShell();q=oldQ;chara=oldChara;page=oldPage;
+      const input=$('#q');if(input)input.value=q;
+      document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.c===chara));
+      renderResults();
+    }
   }catch(e){
-    document.body.innerHTML='<div class="empty">読み込みに失敗しました</div>';
+    if(!shown)document.body.innerHTML='<div class="empty">読み込みに失敗しました</div>';
     console.error(e);
   }
 }
@@ -151,9 +176,9 @@ function renderResults(){
     ? list.map((x,i)=>`
       <article class="card" data-id="${x.id}" style="--delay:${Math.min(i,18)*55}ms">
         <div class="card-img"><img
-          src="${esc(x.image_url)}"
-          loading="${i<6?'eager':'lazy'}"
-          fetchpriority="${i<3?'high':'auto'}"
+          src="${esc(thumbUrl(x.image_url))}"
+          loading="${i<2?'eager':'lazy'}"
+          fetchpriority="${i<2?'high':'low'}"
           decoding="async"
         ></div>
         <div class="card-info">
