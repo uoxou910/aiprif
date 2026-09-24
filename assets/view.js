@@ -4,6 +4,13 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&
 let cards=[],q='',chara='',page=1;
 const PAGE=20;
 
+// 一覧画像のみキャッシュ。管理画面・GAS・拡大画像は対象外。
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  navigator.serviceWorker.register('./image-cache-sw.js', {scope:'./'})
+    .catch(e=>console.warn('画像キャッシュを有効にできませんでした',e));
+}
+
+
 function thumbUrl(url){
   const s=String(url||'');
   const id=s.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1] || s.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)?.[1];
