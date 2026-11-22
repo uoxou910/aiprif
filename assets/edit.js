@@ -24,6 +24,7 @@ function hideSiteACardProgress(){document.getElementById('site-a-card-progress')
 function siteACardBusy(){if(!cardSubmissionInProgress)return false;toast('フレカを保存中です。完了後に操作してください');return true;}
 window.addEventListener('beforeunload',e=>{if(pendingWrites||cardSubmissionInProgress){e.preventDefault();e.returnValue='';}});
 const authKey='site_a_demo_auth_verifier';
+const adminTabTokenKey='freca_site_a_admin_tab_token';
 function localVerifier(password){return 'demo-'+password;} // Only a UI gate, NEVER a security boundary.
 // Original images for local demo are stored as File/Blob in IndexedDB.
 // The ownership metadata keeps only a short reference (idb:...), not a compressed JPEG.
@@ -70,6 +71,24 @@ function hydrateOwnedImages(root=document){
   try{const url=await ownedImageURL(key);if(img.isConnected&&img.dataset.ownedOriginal===key)img.src=url;}catch(e){console.warn('所持コーデ画像を読み込めません',e);}
  });
 }
+async function restoreAdminTab(){
+ const saved=sessionStorage.getItem(adminTabTokenKey);
+ if(!saved){loginScreen();return;}
+ try{
+  // Revalidate the tab-scoped token with GAS before opening the admin screen.
+  const data=await api('admin',{},saved);
+  if(!data||typeof data!=='object'||!Array.isArray(data.cards)||
+     !Array.isArray(data.owned)||!Array.isArray(data.plans))throw Error('管理データを取得できません');
+  token=saved;
+  db=S.sanitize(data);
+  savedSnapshot=S.sanitize(db);
+  dashboard();
+ }catch(e){
+  sessionStorage.removeItem(adminTabTokenKey);
+  token='';
+  loginScreen();
+ }
+}
 function loginScreen(){const demo=S.isDemo();$('#app').innerHTML=`<div class="auth-screen"><div class="login-panel"><h1>フレカ管理ログイン</h1><p class="note">${demo?'ローカル試作モード：最初のログイン時にデモ用パスワードを設定します。公開用の安全な認証ではありません。':'管理パスワードを入力してください。'}</p><form id="login-form"><label class="field">パスワード<span class="password-control"><input type="password" required minlength="4" autocomplete="current-password" id="password"><button id="password-peek" class="password-peek" type="button" aria-label="押している間パスワードを表示" title="押している間パスワードを表示"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label><button class="btn primary" type="submit">${demo?'デモ管理画面を開く':'ログイン'}</button><p class="note" id="login-error"></p></form><p class="note"><a href="index.html">フレカ閲覧ページに戻る</a></p></div></div>`;
 const secretInput=$('#password'),peekButton=$('#password-peek');
 const revealPassword=visible=>{
@@ -112,8 +131,15 @@ $('#login-form').onsubmit=async e=>{e.preventDefault();const pwd=$('#password').
    submit.textContent='データを読み込み中…';
    adminData=await api('admin',{},token);
   }
-  db=S.sanitize(adminData);savedSnapshot=S.sanitize(db);dashboard();
- }catch(err){errorLabel.textContent=err.message;}
+  db=S.sanitize(adminData);
+  savedSnapshot=S.sanitize(db);
+  sessionStorage.setItem(adminTabTokenKey,token);
+  dashboard();
+ }catch(err){
+  token='';
+  sessionStorage.removeItem(adminTabTokenKey);
+  errorLabel.textContent=err.message;
+ }
  finally{busy=false;if(submit.isConnected){submit.disabled=false;submit.textContent=originalLabel;}}
 };
 }
@@ -136,7 +162,7 @@ function dashboard(){
  $('#drawer-close').onclick=()=>toggle(false);
  $$('[data-menu-screen]').forEach(b=>b.onclick=()=>{if(siteACardBusy())return;const screen=b.dataset.menuScreen;mode=screen==='cards'?'cards':'memo';memoTab='colors';filter='';q='';toggle(false);draw();});
  $('#site-a-header-add').onclick=()=>{if(mode==='cards')openCardForm();};
- $('#logout').onclick=()=>{if(siteACardBusy()||pendingWrites){toast('保存処理が完了してからログアウトしてください');return;}token='';loginScreen();};
+ $('#logout').onclick=()=>{if(siteACardBusy()||pendingWrites){toast('保存処理が完了してからログアウトしてください');return;}token='';sessionStorage.removeItem(adminTabTokenKey);loginScreen();};
  document.addEventListener('keydown',ev=>{if(ev.key==='Escape')toggle(false);});
  draw();
 }
@@ -178,7 +204,9 @@ function save(action='save',payload={}){
    draw();
    toast('保存失敗: '+error.message+'（変更を取り消しました）');
    if(!S.isDemo()&&/認証|期限|ログイン|token/i.test(error.message)){
-    token='';loginScreen();
+    token='';
+    sessionStorage.removeItem(adminTabTokenKey);
+    loginScreen();
    }
    return false;
   }finally{pendingWrites--;updateLastSaved();}
@@ -653,6 +681,6 @@ function initColors(){
 if(S.isDemo() && /^https?:$/.test(location.protocol) && !['localhost','127.0.0.1','[::1]'].includes(location.hostname)) {
  $('#app').innerHTML='<main class="auth-screen"><div class="login-panel"><h1>管理画面の準備中</h1><p class="note">サイトA専用の管理GASを設定すると新しい管理機能が使えます。以前のフレカ管理は引き続き利用できます。</p><p><a href="legacy-edit.html">旧フレカ管理画面を開く</a></p><p><a href="index.html">公開画面へ戻る</a></p></div></main>';
 } else {
- loginScreen();
+ restoreAdminTab();
 }
 })();
