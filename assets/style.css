@@ -1036,3 +1036,8 @@ body[data-page="edit"] .admin-card-grid .admin-sub {
  body[data-page="edit"] .admin-card-grid .admin-title {font-size:12px;}
  body[data-page="edit"] .admin-card-grid .admin-sub {font-size:11px;}
 }
+
+/* Site A admin: visually distinguish non-public cards like Site B. */
+body[data-page="edit"] .site-a-unlisted .admin-image {
+ opacity:.55;
+}
