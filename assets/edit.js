@@ -2,13 +2,27 @@
 let db=S.base(),token='',mode='cards',memoTab='owned',filter='',q='',mikukoOnly=false,editing=null,imgBuffer='',busy=false;
 let savedSnapshot=S.base(),saveTail=Promise.resolve(),writeSeq=0,discardThrough=0,pendingWrites=0;
 let cardSubmissionInProgress=false;
+// The current Site A GAS schema stores no separate visibility field.
+// Keep independent flags in invisible suffixes on the code column.
 const MIKUKO_CODE_MARK='\u2064\u2064\u2064';
-const siteAMikukoCode=code=>{
- const text=String(code??'');
- return text.endsWith(MIKUKO_CODE_MARK)?text.slice(0,-MIKUKO_CODE_MARK.length):text;
-};
-const siteAMikukoFlag=code=>String(code??'').endsWith(MIKUKO_CODE_MARK);
-const siteAMikukoEncode=(code,mikuko)=>siteAMikukoCode(code)+(mikuko?MIKUKO_CODE_MARK:'');
+const NONPUBLIC_CODE_MARK='\u2062\u2062\u2062';
+function siteACodeMeta(rawCode){
+ let code=String(rawCode??''),mikuko=false,hidden=false;
+ for(;;){
+  if(code.endsWith(MIKUKO_CODE_MARK)){
+   code=code.slice(0,-MIKUKO_CODE_MARK.length);mikuko=true;
+  }else if(code.endsWith(NONPUBLIC_CODE_MARK)){
+   code=code.slice(0,-NONPUBLIC_CODE_MARK.length);hidden=true;
+  }else break;
+ }
+ return {code,mikuko,hidden};
+}
+const siteAMikukoCode=code=>siteACodeMeta(code).code;
+const siteAMikukoFlag=code=>siteACodeMeta(code).mikuko;
+const siteAHiddenFlag=code=>siteACodeMeta(code).hidden;
+const siteAMikukoEncode=(code,mikuko,hidden=false)=>siteACodeMeta(code).code+
+ (mikuko?MIKUKO_CODE_MARK:'')+(hidden?NONPUBLIC_CODE_MARK:'');
+
 function siteACardProgress(message){
  let element=document.getElementById('site-a-card-progress');
  if(!element){
@@ -270,7 +284,7 @@ function save(action='save',payload={}){
 }
 function filterbar(placeholder){return `<label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 5 5"/></svg><input id="search" type="search" placeholder="${esc(placeholder)}" autocomplete="off" value="${esc(q)}"></label>`;}
 function charOptions(){return `<div class="character-filter" id="filter-row" aria-label="キャラクターを絞り込み"><button class="filter-pill filter-all ${!filter?'active':''}" data-filter="" style="${S.characterStyle('すべて',db.colors)}">すべて</button><div class="filter-scroll" tabindex="0" aria-label="左右にスクロールしてキャラクターを選択">${chars.map(c=>`<button class="filter-pill ${filter===c?'active':''}" data-filter="${esc(c)}" style="${S.characterStyle(c,db.colors)}">${esc(c)}</button>`).join('')}</div></div>`;}
-function renderCards(){const rows=db.cards.filter(x=>(!filter||x.chara===filter)&&(!mikukoOnly||siteAMikukoFlag(x.code))&&norm(siteAMikukoCode(x.code)).includes(norm(q)));return `<div class="section-head"><h2>フレカ一覧 <small class="note">${rows.length}件</small></h2></div><div class="site-a-mikuko-search-row">${filterbar('コーデ名で検索')}<label class="site-a-mikuko-check site-a-mikuko-search-check"><input type="checkbox" id="site-a-mikuko-only" ${mikukoOnly?'checked':''}>ミクコ</label></div>${charOptions()}<div class="admin-card-grid">${rows.length?rows.map(x=>`<article class="admin-card"><div class="admin-image" data-view-image="${esc(x.id)}">${cardImage(x.image_url,siteAMikukoCode(x.code))}</div><div class="admin-card-body"><div class="admin-title">${esc(x.chara)}</div><div class="admin-sub">${esc(siteAMikukoCode(x.code))}</div><div class="row"><button class="tiny-btn" data-edit="cards:${esc(x.id)}">編集</button><button class="tiny-btn danger" data-remove="cards:${esc(x.id)}">削除</button></div></div></article>`).join(''):'<div class="placeholder-panel">フレカがありません</div>'}</div>`;}
+function renderCards(){const rows=db.cards.filter(x=>(!filter||x.chara===filter)&&(!mikukoOnly||siteAMikukoFlag(x.code))&&norm(siteAMikukoCode(x.code)).includes(norm(q)));return `<div class="section-head"><h2>フレカ一覧 <small class="note">${rows.length}件</small></h2></div><div class="site-a-mikuko-search-row">${filterbar('コーデ名で検索')}<label class="site-a-mikuko-check site-a-mikuko-search-check"><input type="checkbox" id="site-a-mikuko-only" ${mikukoOnly?'checked':''}>ミクコ</label></div>${charOptions()}<div class="admin-card-grid">${rows.length?rows.map(x=>`<article class="admin-card ${siteAHiddenFlag(x.code)?'site-a-unlisted':''}"><div class="admin-image" data-view-image="${esc(x.id)}">${cardImage(x.image_url,siteAMikukoCode(x.code))}</div><div class="admin-card-body"><div class="admin-title">${esc(x.chara)}</div><div class="admin-sub">${esc(siteAMikukoCode(x.code))}${siteAHiddenFlag(x.code)?' ・ 非公開':''}</div><div class="row"><button class="tiny-btn" data-edit="cards:${esc(x.id)}">編集</button><button type="button" class="tiny-btn" data-visibility="${esc(x.id)}">${siteAHiddenFlag(x.code)?'公開する':'非公開にする'}</button><button class="tiny-btn danger" data-remove="cards:${esc(x.id)}">削除</button></div></div></article>`).join(''):'<div class="placeholder-panel">フレカがありません</div>'}</div>`;}
 function ownershipRows(){const rows=[...db.owned.map(x=>({...x,source:'owned'})),...db.plans.filter(x=>x.done).map(x=>({...x,source:'plans'}))];const map=new Map();for(const x of rows){const k=norm(x.code)+'|'+x.chara;if(!map.has(k))map.set(k,x);else if(x.source==='owned')map.set(k,x);}return [...map.values()];}
 function renderOwned(){
  const rows=ownershipRows().filter(x=>(!filter||x.chara===filter)&&norm(x.code).includes(norm(q)));
@@ -328,7 +342,8 @@ function draw(preserveFilter=false){
  $$('[data-edit-group]').forEach(b=>b.onclick=()=>openOwnershipForm(b.dataset.editGroup));
  $$('[data-remove-group]').forEach(b=>b.onclick=()=>removeOwnershipGroup(b.dataset.removeGroup));
  $$('[data-edit]').forEach(b=>b.onclick=()=>{const [type,id]=b.dataset.edit.split(':');if(type==='cards')openCardForm(id);});
- $$('[data-remove]').forEach(b=>b.onclick=()=>{const [type,id]=b.dataset.remove.split(':');if(type==='cards')remove(type,id);});
+ $('[data-remove]').forEach(b=>b.onclick=()=>{const [type,id]=b.dataset.remove.split(':');if(type==='cards')remove(type,id);});
+ $('[data-visibility]').forEach(b=>b.onclick=()=>toggleCardVisibility(b.dataset.visibility));
  $$('[data-check]').forEach(b=>b.onchange=()=>{
   const x=db.plans.find(x=>x.id===b.dataset.check);if(!x)return;
   x.done=b.checked;
