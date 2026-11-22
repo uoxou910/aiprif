@@ -270,7 +270,7 @@ function save(action='save',payload={}){
 }
 function filterbar(placeholder){return `<label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 5 5"/></svg><input id="search" type="search" placeholder="${esc(placeholder)}" autocomplete="off" value="${esc(q)}"></label>`;}
 function charOptions(){return `<div class="character-filter" id="filter-row" aria-label="キャラクターを絞り込み"><button class="filter-pill filter-all ${!filter?'active':''}" data-filter="" style="${S.characterStyle('すべて',db.colors)}">すべて</button><div class="filter-scroll" tabindex="0" aria-label="左右にスクロールしてキャラクターを選択">${chars.map(c=>`<button class="filter-pill ${filter===c?'active':''}" data-filter="${esc(c)}" style="${S.characterStyle(c,db.colors)}">${esc(c)}</button>`).join('')}</div></div>`;}
-function renderCards(){const rows=db.cards.filter(x=>(!filter||x.chara===filter)&&(!mikukoOnly||siteAMikukoFlag(x.code))&&norm(siteAMikukoCode(x.code)).includes(norm(q)));return `<div class="section-head"><h2>フレカ一覧 <small class="note">${rows.length}件</small></h2></div><div class="site-a-mikuko-search-row">${filterbar('コーデ名で検索')}<label class="site-a-mikuko-check site-a-mikuko-search-check"><input type="checkbox" id="site-a-mikuko-only" ${mikukoOnly?'checked':''}>ミクコ</label></div>${charOptions()}<div class="admin-card-grid">${rows.length?rows.map(x=>`<article class="admin-card"><div class="admin-image" data-view-image="${esc(x.id)}">${cardImage(x.image_url,siteAMikukoCode(x.code))}</div><div class="admin-card-body"><div class="admin-title">${esc(siteAMikukoCode(x.code))}</div><div class="admin-sub">${esc(x.chara)}</div><div class="row"><button class="tiny-btn" data-edit="cards:${esc(x.id)}">編集</button><button class="tiny-btn danger" data-remove="cards:${esc(x.id)}">削除</button></div></div></article>`).join(''):'<div class="placeholder-panel">フレカがありません</div>'}</div>`;}
+function renderCards(){const rows=db.cards.filter(x=>(!filter||x.chara===filter)&&(!mikukoOnly||siteAMikukoFlag(x.code))&&norm(siteAMikukoCode(x.code)).includes(norm(q)));return `<div class="section-head"><h2>フレカ一覧 <small class="note">${rows.length}件</small></h2></div><div class="site-a-mikuko-search-row">${filterbar('コーデ名で検索')}<label class="site-a-mikuko-check site-a-mikuko-search-check"><input type="checkbox" id="site-a-mikuko-only" ${mikukoOnly?'checked':''}>ミクコ</label></div>${charOptions()}<div class="admin-card-grid">${rows.length?rows.map(x=>`<article class="admin-card"><div class="admin-image" data-view-image="${esc(x.id)}">${cardImage(x.image_url,siteAMikukoCode(x.code))}</div><div class="admin-card-body"><div class="admin-title">${esc(x.chara)}</div><div class="admin-sub">${esc(siteAMikukoCode(x.code))}</div><div class="row"><button class="tiny-btn" data-edit="cards:${esc(x.id)}">編集</button><button class="tiny-btn danger" data-remove="cards:${esc(x.id)}">削除</button></div></div></article>`).join(''):'<div class="placeholder-panel">フレカがありません</div>'}</div>`;}
 function ownershipRows(){const rows=[...db.owned.map(x=>({...x,source:'owned'})),...db.plans.filter(x=>x.done).map(x=>({...x,source:'plans'}))];const map=new Map();for(const x of rows){const k=norm(x.code)+'|'+x.chara;if(!map.has(k))map.set(k,x);else if(x.source==='owned')map.set(k,x);}return [...map.values()];}
 function renderOwned(){
  const rows=ownershipRows().filter(x=>(!filter||x.chara===filter)&&norm(x.code).includes(norm(q)));
@@ -647,8 +647,8 @@ function openCardForm(id=''){
    const entry=$$('[data-edit]').find(b=>b.dataset.edit==='cards:'+card.id)?.closest('.admin-card');
    if(entry){
     const title=$('.admin-title',entry),subtitle=$('.admin-sub',entry);
-    if(title)title.textContent=card.code;
-    if(subtitle)subtitle.textContent=card.chara;
+    if(title)title.textContent=card.chara;
+    if(subtitle)subtitle.textContent=siteAMikukoCode(card.code);
    }else draw();
   }else draw();
   siteACardProgress('フレカを保存中… このページを閉じないでください');
