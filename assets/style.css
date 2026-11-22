@@ -855,3 +855,67 @@ body[data-page="edit"] .card-entry-dialog .card-chara-bulk input[type="checkbox"
 @media (max-width:699px) {
  body[data-page="edit"] .card-entry-dialog .card-chara-bulk {font-size:13px;}
 }
+
+/* Site A: Mikuko-only card tagging and AND search filter. */
+body[data-page="edit"] .site-a-mikuko-search-row {
+ display:flex;
+ align-items:center;
+ gap:14px;
+ width:100%;
+ max-width:870px;
+}
+body[data-page="edit"] .site-a-mikuko-search-row > .search {
+ flex:1 1 auto;
+ min-width:0;
+ width:100%;
+}
+body[data-page="edit"] .site-a-mikuko-check {
+ display:inline-flex;
+ align-items:center;
+ justify-content:flex-end;
+ gap:7px;
+ flex:0 0 auto;
+ color:#595263;
+ font-size:12px;
+ line-height:1.45;
+ white-space:nowrap;
+ cursor:pointer;
+ user-select:none;
+}
+body[data-page="edit"] .site-a-mikuko-check input[type="checkbox"] {
+ appearance:auto;
+ flex:0 0 auto;
+ width:16px;
+ height:16px;
+ margin:0;
+ accent-color:#746c83;
+ cursor:pointer;
+}
+body[data-page="edit"] .site-a-mikuko-search-check {padding:10px 0;}
+body[data-page="edit"] .site-a-card-heading {flex-wrap:wrap;}
+body[data-page="edit"] .site-a-card-heading-right {
+ display:flex;
+ align-items:center;
+ gap:14px;
+ margin-left:auto;
+}
+body[data-page="edit"] .card-entry-dialog .site-a-upload-mikuko {align-self:center;}
+@media (max-width:499px) {
+ body[data-page="edit"] .site-a-mikuko-search-row {gap:9px;}
+ body[data-page="edit"] .site-a-mikuko-search-row > .search {padding-left:11px;padding-right:11px;gap:8px;}
+ body[data-page="edit"] .card-entry-dialog .upload-entry {
+  display:grid;
+  grid-template-columns:65px minmax(0,1fr) 32px;
+  grid-template-rows:auto auto;
+  column-gap:8px;
+  row-gap:7px;
+ }
+ body[data-page="edit"] .card-entry-dialog .upload-thumb {grid-column:1;grid-row:1;}
+ body[data-page="edit"] .card-entry-dialog .upload-fields {grid-column:2;grid-row:1;}
+ body[data-page="edit"] .card-entry-dialog .upload-remove {grid-column:3;grid-row:1;}
+ body[data-page="edit"] .card-entry-dialog .site-a-upload-mikuko {
+  grid-column:2 / 4;
+  grid-row:2;
+  justify-self:end;
+ }
+}
