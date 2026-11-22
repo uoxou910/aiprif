@@ -1,5 +1,12 @@
 (async()=>{'use strict';const S=window.SiteD,{ $, $$, esc,norm,api,cardImage,buildCharacterNav,theme,toast}=S;
 const COLOR_CACHE_KEY='site_a_public_colors_v1';
+// Mikuko metadata shares the original Site A GAS code column.
+// Strip its invisible marker from public cards and search.
+const MIKUKO_CODE_MARK='\u2064\u2064\u2064';
+const stripMikuko=card=>{
+ const code=String(card.code??'');
+ return {...card,code:code.endsWith(MIKUKO_CODE_MARK)?code.slice(0,-MIKUKO_CODE_MARK.length):code};
+};
 function initialPublicColors(){
  const boot=window.SITE_D_BOOTSTRAP_COLORS||{};
  const bootTime=Date.parse(boot.syncedAt||'')||0;
@@ -45,7 +52,7 @@ $$('.card-picture').forEach(el=>el.addEventListener('click',()=>{const x=cards.f
 $('#query').addEventListener('input',e=>{query=e.target.value;page=1;render();});$('#close').onclick=()=>$('#overlay').classList.add('hidden');$('#overlay').onclick=e=>{if(e.target.id==='overlay')$('#overlay').classList.add('hidden');};document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#overlay').classList.add('hidden')});
 try{
  const d=await api('public');
- cards=(Array.isArray(d.cards)?d.cards:[]).filter(x=>x&&typeof x.code==='string');
+ cards=(Array.isArray(d.cards)?d.cards:[]).filter(x=>x&&typeof x.code==='string').map(stripMikuko);
  if(d.colors&&typeof d.colors==='object'){
   const fresh={...S.DEFAULT_COLORS,...d.colors};
   if(JSON.stringify(colors)!==JSON.stringify(fresh)){
