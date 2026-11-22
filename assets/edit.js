@@ -551,7 +551,7 @@ function openCardForm(id=''){
  if(siteACardBusy())return;
  const existing=db.cards.find(x=>x.id===id);
  const defaultChara=existing?.chara||filter||'';
- let entries=existing?[{key:uuid(),id:existing.id,code:siteAMikukoCode(existing.code),chara:defaultChara,mikuko:siteAMikukoFlag(existing.code),image:existing.image_url||''}]:[];
+ let entries=existing?[{key:uuid(),id:existing.id,code:siteAMikukoCode(existing.code),chara:defaultChara,mikuko:siteAMikukoFlag(existing.code),hidden:siteAHiddenFlag(existing.code),image:existing.image_url||''}]:[];
  const single=!!existing,demo=S.isDemo();
  let submitting=false,copyFirstChara=false;
  const previewUrls=new Set();
@@ -602,7 +602,7 @@ function openCardForm(id=''){
    const img=demo?await resize(file):URL.createObjectURL(file);
    if(!demo)previewUrls.add(img);
    if(single){entries[0].image=img;entries[0].file=demo?null:file;}
-   else entries.push({key:uuid(),id:'',code:'',chara:filter||'',mikuko:false,image:img,file:demo?null:file});
+   else entries.push({key:uuid(),id:'',code:'',chara:filter||'',mikuko:false,hidden:false,image:img,file:demo?null:file});
   }catch(err){toast(err.message);}}
   if(zone.isConnected)zone.classList.remove('upload-busy');
   paint();$('#upload-entries [data-code]')?.focus();
@@ -624,7 +624,10 @@ function openCardForm(id=''){
  const valid=entries.map(row=>({...row,code:String(row.code||'').trim(),chara:String(row.chara||'').trim()}));
  if(!valid.length){toast('画像を追加してください');return;}
  if(valid.some(row=>!row.code||!chars.includes(row.chara))){toast('コーデ名とサイトAのキャラ名を入力してください');return;}
- if(valid.some(row=>row.mikuko&&row.code.length>117)){toast('ミクコにチェックしたコーデ名は117文字以内で入力してください');return;}
+ if(valid.some(row=>siteAMikukoEncode(row.code,!!row.mikuko,!!row.hidden).length>120)){
+  toast('コーデ名と設定を合わせて120文字以内にしてください（ミクコ＋非公開の場合は114文字以内）');
+  return;
+ }
  submitting=true;
  cardSubmissionInProgress=true;
  const button=$('#card-submit-actions button[type="submit"]');
@@ -650,7 +653,7 @@ function openCardForm(id=''){
   }
   const now=new Date().toISOString();
   for(const row of valid){
-   const card={id:row.id||uuid(),code:siteAMikukoEncode(row.code,!!row.mikuko),chara:row.chara,image_url:row.image,updated_at:now};
+   const card={id:row.id||uuid(),code:siteAMikukoEncode(row.code,!!row.mikuko,!!row.hidden),chara:row.chara,image_url:row.image,updated_at:now};
    const old=db.cards.find(c=>c.id===row.id);
    if(old)Object.assign(old,card);
    else db.cards.push(card);
@@ -663,7 +666,7 @@ function openCardForm(id=''){
    if(entry){
     const title=$('.admin-title',entry),subtitle=$('.admin-sub',entry);
     if(title)title.textContent=card.chara;
-    if(subtitle)subtitle.textContent=siteAMikukoCode(card.code);
+    if(subtitle)subtitle.textContent=siteAMikukoCode(card.code)+(card.hidden?' ・ 非公開':'');
    }else draw();
   }else draw();
   siteACardProgress('フレカを保存中… このページを閉じないでください');
@@ -712,6 +715,31 @@ async function resizeOwnedImage(file){
  });
 }
 async function resize(file){if(!file.type.startsWith('image/'))throw Error('画像を指定してください');if(file.size>16*1024*1024)throw Error('画像は16MB以下にしてください');return new Promise((resolve,reject)=>{const r=new FileReader();r.onerror=()=>reject(Error('画像を読み込めません'));r.onload=()=>{const image=new Image();image.onerror=()=>reject(Error('画像形式が不正です'));image.onload=()=>{const canvas=document.createElement('canvas');const ratio=Math.min(1,900/Math.max(image.width,image.height));canvas.width=Math.max(1,Math.round(image.width*ratio));canvas.height=Math.max(1,Math.round(image.height*ratio));canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);resolve(canvas.toDataURL('image/jpeg',.76));};image.src=r.result;};r.readAsDataURL(file);});}
+async function toggleCardVisibility(id){
+ if(siteACardBusy())return;
+ if(pendingWrites){toast('保存処理中です。完了後に操作してください');return;}
+ const card=db.cards.find(x=>String(x.id)===String(id));
+ if(!card)return;
+ const meta=siteACodeMeta(card.code),hidden=!meta.hidden;
+ const newCode=siteAMikukoEncode(meta.code,meta.mikuko,hidden);
+ if(newCode.length>120){
+  toast('非公開設定にはコーデ名を117文字以内（ミクコも設定する場合は114文字以内）にしてください');
+  return;
+ }
+ cardSubmissionInProgress=true;
+ card.code=newCode;
+ db.lastCardsUpdated=new Date().toISOString();
+ draw();
+ siteACardProgress('公開状態を保存中… このページを閉じないでください');
+ try{
+  const ok=await save();
+  if(ok)toast(hidden?'非公開にしました':'公開しました');
+  else alert('公開状態を保存できませんでした。変更は元に戻しました。');
+ }finally{
+  cardSubmissionInProgress=false;
+  hideSiteACardProgress();
+ }
+}
 async function remove(type,id){if(siteACardBusy())return;const list=db[type],idx=list.findIndex(x=>x.id===id);if(idx<0||!confirm('「'+list[idx].code+'」を削除しますか？'))return;const backup=JSON.stringify(db);list.splice(idx,1);if(type==='cards')db.lastCardsUpdated=new Date().toISOString();save();draw();}
 function initColors(){
  const pending=JSON.parse(JSON.stringify(db.colors));
