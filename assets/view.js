@@ -1,5 +1,25 @@
 (async()=>{'use strict';const S=window.SiteD,{ $, $$, esc,norm,api,cardImage,buildCharacterNav,theme,toast}=S;
 const COLOR_CACHE_KEY='site_a_public_colors_v1';
+const PUBLIC_CARD_CACHE_KEY='site_a_public_cards_v1';
+function thumbnailUrl(src){
+ const url=String(src||'');
+ const id=url.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1]||url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)?.[1];
+ if(!id || !/^https:\/\/(?:drive|docs)\.google\.com\//.test(url))return url;
+ return 'https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w640';
+}
+function listCardImage(src,code,index){
+ if(!src)return cardImage(src,code);
+ return `<img src="${esc(thumbnailUrl(src))}" alt="${esc(code)}" loading="${index<4?'eager':'lazy'}" decoding="async" ${index<2?'fetchpriority="high"':''}>`;
+}
+function restoreCardCache(){
+ try{
+  const cached=JSON.parse(localStorage.getItem(PUBLIC_CARD_CACHE_KEY)||'null');
+  return Array.isArray(cached?.cards)?cached:null;
+ }catch(_){return null;}
+}
+function storeCardCache(d){
+ try{localStorage.setItem(PUBLIC_CARD_CACHE_KEY,JSON.stringify({cards:d.cards,lastCardsUpdated:d.lastCardsUpdated||''}));}catch(_){}
+}
 function initialPublicColors(){
  const boot=window.SITE_D_BOOTSTRAP_COLORS||{};
  const bootTime=Date.parse(boot.syncedAt||'')||0;
@@ -36,16 +56,25 @@ $('#drawer-close').onclick=()=>toggleMenu(false);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')toggleMenu(false);});
 const navRoot=$('#character-navigation');
 const nav=buildCharacterNav(c=>{character=c;page=1;render();},{colors});navRoot.innerHTML=nav.html;const navActions=nav.init(navRoot);
+const cachedPublic=restoreCardCache();
+if(cachedPublic){
+ cards=cachedPublic.cards.filter(x=>x&&typeof x.code==='string');
+ lastCardsUpdated=cachedPublic.lastCardsUpdated||'';
+ $('#update').textContent=dateUpdate();
+ render();
+}
 function pages(current,total){if(total<=7)return Array.from({length:total},(_,i)=>i+1);const out=[1];let a=Math.max(2,current-1),b=Math.min(total-1,current+1);if(current<=3){a=2;b=4;}else if(current>=total-2){a=total-3;b=total-1;}if(a>2)out.push('…');for(let i=a;i<=b;i++)out.push(i);if(b<total-1)out.push('…');out.push(total);return out;}
 function render(){const filtered=cards.filter(x=>(!character||x.chara===character)&&(!query||norm(x.code).includes(norm(query))));const total=Math.max(1,Math.ceil(filtered.length/PAGE));page=Math.min(page,total);const rows=filtered.slice((page-1)*PAGE,page*PAGE);
-$('#grid').innerHTML=rows.length?rows.map(x=>`<article class="freca-card" data-id="${esc(x.id)}" style="--stagger:${Math.min(rows.indexOf(x),9)*32}ms"><div class="card-picture" data-id="${esc(x.id)}">${cardImage(x.image_url,x.code)}</div><div class="card-detail"><div class="card-chara">${esc(x.chara)}</div><div class="card-code">${esc(x.code)}</div></div></article>`).join(''):'<div class="placeholder-panel">カードがありません</div>';
+$('#grid').innerHTML=rows.length?rows.map((x,i)=>`<article class="freca-card" data-id="${esc(x.id)}" style="--stagger:${Math.min(i,9)*32}ms"><div class="card-picture" data-id="${esc(x.id)}">${listCardImage(x.image_url,x.code,i)}</div><div class="card-detail"><div class="card-chara">${esc(x.chara)}</div><div class="card-code">${esc(x.code)}</div></div></article>`).join(''):'<div class="placeholder-panel">カードがありません</div>';
 $('#pager').innerHTML=total<=1?'':`<button data-page="${page-1}" ${page===1?'disabled':''}>‹</button>${pages(page,total).map(p=>p==='…'?'<span class="pager-ellipsis">…</span>':`<button data-page="${p}" class="${p===page?'active':''}">${p}</button>`).join('')}<button data-page="${page+1}" ${page===total?'disabled':''}>›</button>`;
 $$('#pager [data-page]').forEach(b=>b.addEventListener('click',()=>{if(b.disabled)return;page=+b.dataset.page;render();scrollTo({top:0,behavior:'smooth'});}));
 $$('.card-picture').forEach(el=>el.addEventListener('click',()=>{const x=cards.find(x=>String(x.id)===el.dataset.id);if(!x?.image_url)return;$('#full-image').src=x.image_url;$('#overlay').classList.remove('hidden');}));}
 $('#query').addEventListener('input',e=>{query=e.target.value;page=1;render();});$('#close').onclick=()=>$('#overlay').classList.add('hidden');$('#overlay').onclick=e=>{if(e.target.id==='overlay')$('#overlay').classList.add('hidden');};document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#overlay').classList.add('hidden')});
 try{
  const d=await api('public');
- cards=(Array.isArray(d.cards)?d.cards:[]).filter(x=>x&&typeof x.code==='string');
+ const nextCards=(Array.isArray(d.cards)?d.cards:[]).filter(x=>x&&typeof x.code==='string');
+ const cardsChanged=JSON.stringify(cards)!==JSON.stringify(nextCards);
+ cards=nextCards;
  if(d.colors&&typeof d.colors==='object'){
   const fresh={...S.DEFAULT_COLORS,...d.colors};
   if(JSON.stringify(colors)!==JSON.stringify(fresh)){
@@ -54,6 +83,11 @@ try{
   try{localStorage.setItem(COLOR_CACHE_KEY,JSON.stringify({colors:fresh,syncedAt:Date.now()}));}catch(_){}
  }
  lastCardsUpdated=d.lastCardsUpdated||'';
- $('#update').textContent=dateUpdate();render();
-}catch(e){console.error(e);$('#grid').innerHTML=`<div class="placeholder-panel">読み込みに失敗しました。<br>${esc(e.message)}</div>`;}
+ $('#update').textContent=dateUpdate();
+ storeCardCache({cards,lastCardsUpdated});
+ if(cardsChanged || !cachedPublic)render();
+}catch(e){
+ console.error(e);
+ if(!cachedPublic)$('#grid').innerHTML=`<div class="placeholder-panel">読み込みに失敗しました。<br>${esc(e.message)}</div>`;
+}
 })();
