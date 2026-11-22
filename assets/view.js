@@ -1,14 +1,21 @@
 (async()=>{'use strict';const S=window.SiteD,{ $, $$, esc,norm,api,cardImage,buildCharacterNav,theme,toast}=S;
 const COLOR_CACHE_KEY='site_a_public_colors_v1';
-// The Site A GAS stores Mikuko as an invisible suffix on the code field.
-// Read the flag for public search, but never show the suffix as part of the name.
+// Site A GAS keeps Mikuko and non-public flags as invisible code suffixes.
+// Decode both; never show either suffix in names or search results.
 const MIKUKO_CODE_MARK='\u2064\u2064\u2064';
+const NONPUBLIC_CODE_MARK='\u2062\u2062\u2062';
 const stripMikuko=card=>{
- const code=String(card.code??'');
- const marked=code.endsWith(MIKUKO_CODE_MARK);
- return {...card,
-  code:marked?code.slice(0,-MIKUKO_CODE_MARK.length):code,
-  mikuko:marked||card.mikuko===true||String(card.mikuko).toLowerCase()==='true'};
+ let code=String(card.code??''),mikuko=false,hidden=false;
+ for(;;){
+  if(code.endsWith(MIKUKO_CODE_MARK)){
+   code=code.slice(0,-MIKUKO_CODE_MARK.length);mikuko=true;
+  }else if(code.endsWith(NONPUBLIC_CODE_MARK)){
+   code=code.slice(0,-NONPUBLIC_CODE_MARK.length);hidden=true;
+  }else break;
+ }
+ return {...card,code,
+  mikuko:mikuko||card.mikuko===true||String(card.mikuko).toLowerCase()==='true',
+  hidden:hidden||card.visible===false};
 };
 function initialPublicColors(){
  const boot=window.SITE_D_BOOTSTRAP_COLORS||{};
@@ -66,7 +73,7 @@ $('#public-mikuko-only').addEventListener('change',e=>{mikukoOnly=e.target.check
 $('#close').onclick=()=>$('#overlay').classList.add('hidden');$('#overlay').onclick=e=>{if(e.target.id==='overlay')$('#overlay').classList.add('hidden');};document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#overlay').classList.add('hidden')});
 try{
  const d=await api('public');
- cards=(Array.isArray(d.cards)?d.cards:[]).filter(x=>x&&typeof x.code==='string').map(stripMikuko);
+ cards=(Array.isArray(d.cards)?d.cards:[]).filter(x=>x&&typeof x.code==='string').map(stripMikuko).filter(x=>!x.hidden);
  if(d.colors&&typeof d.colors==='object'){
   const fresh={...S.DEFAULT_COLORS,...d.colors};
   if(JSON.stringify(colors)!==JSON.stringify(fresh)){
