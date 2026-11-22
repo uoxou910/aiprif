@@ -487,43 +487,67 @@ function openCardForm(id=''){
   zone.ondragleave=()=>zone.classList.remove('dragging');
   zone.ondrop=e=>{e.preventDefault();zone.classList.remove('dragging');addFiles(e.dataTransfer.files);};
  }
- $('#card-form').onsubmit=async e=>{e.preventDefault();if(busy||submitting)return;
-  const valid=entries.map(x=>({...x,code:x.code.trim()}));
-  if(!valid.length){toast('画像を追加してください');return;}
-  if(valid.some(x=>!x.code||!chars.includes(x.chara))){toast('各コーデの名前とマイキャラを入力してください');return;}
-  submitting=true;
-  const button=$('#card-submit-actions button[type="submit"]');
-  button.disabled=true;
-  const buttonLabel=button.textContent;
-  try{
-   if(!demo){
-    let n=0;const total=valid.filter(x=>x.file).length;
-    for(const row of valid){
-     if(!row.file)continue;
-     button.textContent=`画像をアップロード中 ${++n}/${total}`;
-     const raw=await new Promise((resolve,reject)=>{
-      const reader=new FileReader();reader.onerror=()=>reject(Error('画像を読み込めませんでした'));
-      reader.onload=()=>resolve(String(reader.result).split(',')[1]||'');
-      reader.readAsDataURL(row.file);
-     });
-     const result=await api('uploadImage',{filename:row.file.name,mimeType:row.file.type,base64:raw},token);
-     if(!result?.url||!/^https:\/\//.test(result.url))throw Error('画像URLが取得できませんでした');
-     row.image=result.url;
-     const original=entries.find(x=>x.key===row.key);
-     if(original){original.image=row.image;original.file=null;}
-    }
+ $('#card-form').onsubmit=async e=>{
+ e.preventDefault();
+ if(busy||submitting||cardSubmissionInProgress)return;
+ const valid=entries.map(row=>({...row,code:String(row.code||'').trim(),chara:String(row.chara||'').trim()}));
+ if(!valid.length){toast('画像を追加してください');return;}
+ if(valid.some(row=>!row.code||!chars.includes(row.chara))){toast('コーデ名とサイトAのキャラ名を入力してください');return;}
+ submitting=true;
+ cardSubmissionInProgress=true;
+ const button=$('#card-submit-actions button[type="submit"]');
+ if(button)button.disabled=true;
+ closeCard();
+ siteACardProgress('フレカを保存中… このページを閉じないでください');
+ try{
+  const fileRows=valid.filter(row=>row.file);
+  if(!demo){
+   let uploaded=0;
+   for(const row of fileRows){
+    siteACardProgress(`画像をアップロード中 ${++uploaded}/${fileRows.length}件。このページを閉じないでください`);
+    const raw=await new Promise((resolve,reject)=>{
+     const reader=new FileReader();
+     reader.onerror=()=>reject(Error('画像を読み込めませんでした'));
+     reader.onload=()=>resolve(String(reader.result).split(',')[1]||'');
+     reader.readAsDataURL(row.file);
+    });
+    const image=await api('uploadImage',{filename:row.file.name,mimeType:row.file.type,base64:raw},token);
+    if(!image?.url||!/^https:\/\//.test(image.url))throw Error('画像URLが取得できませんでした');
+    row.image=image.url;
    }
-   button.textContent='保存中';
-   const snapshot=JSON.stringify(db),now=new Date().toISOString();
-   for(const row of valid){
-    const card={id:row.id||uuid(),code:row.code,chara:row.chara,image_url:row.image,updated_at:now};
-    const old=db.cards.find(c=>c.id===row.id);if(old)Object.assign(old,card);else db.cards.push(card);
-   }
-   db.lastCardsUpdated=now;
-   save();closeCard();draw();
-  }catch(err){toast('画像アップロード失敗: '+err.message);}
-  finally{if(button.isConnected){button.disabled=false;button.textContent=buttonLabel;}submitting=false;}
- };
+  }
+  const now=new Date().toISOString();
+  for(const row of valid){
+   const card={id:row.id||uuid(),code:row.code,chara:row.chara,image_url:row.image,updated_at:now};
+   const old=db.cards.find(c=>c.id===row.id);
+   if(old)Object.assign(old,card);
+   else db.cards.push(card);
+  }
+  db.lastCardsUpdated=now;
+  // Avoid rebuilding every image when only an existing card's labels changed.
+  if(single&&fileRows.length===0&&!filter&&!q){
+   const card=valid[0];
+   const entry=$$('[data-edit]').find(b=>b.dataset.edit==='cards:'+card.id)?.closest('.admin-card');
+   if(entry){
+    const title=$('.admin-title',entry),subtitle=$('.admin-sub',entry);
+    if(title)title.textContent=card.code;
+    if(subtitle)subtitle.textContent=card.chara;
+   }else draw();
+  }else draw();
+  siteACardProgress('フレカを保存中… このページを閉じないでください');
+  const ok=await save();
+  if(ok)toast('保存しました');
+  else alert('フレカを保存できませんでした。変更は元に戻しました。');
+ }catch(err){
+  console.error(err);
+  alert('フレカの保存に失敗しました：'+err.message);
+ }finally{
+  cardSubmissionInProgress=false;
+  submitting=false;
+  hideSiteACardProgress();
+ }
+};
+
  paint();
 }
 async function resizeOwnedImage(file){
