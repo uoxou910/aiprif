@@ -728,3 +728,26 @@ body[data-page="edit"] .admin-shell .search:focus-within {
  .ownership-image-preview{flex-basis:105px;width:105px;max-height:145px}
  .ownership-image-preview img{max-height:145px}
 }
+
+/* Site A mobile public view: compact search (3/4) and character bar (3/5). */
+@media (max-width:699px) {
+  body[data-page="view"] .search-dock > .search {
+    height:39px;
+    min-height:39px;
+  }
+  body[data-page="view"] .bottom-nav {
+    height:46px;
+  }
+  body[data-page="view"] .bottom-nav-inner {
+    height:46px;
+  }
+  body[data-page="view"] .bottom-all,
+  body[data-page="view"] .bottom-char {
+    min-height:0;
+    padding-top:4px;
+    padding-bottom:4px;
+  }
+  body[data-page="view"] {
+    padding-bottom:calc(70px + env(safe-area-inset-bottom,0px));
+  }
+}
