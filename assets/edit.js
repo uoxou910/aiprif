@@ -98,7 +98,7 @@ $('#login-form').onsubmit=async e=>{e.preventDefault();const pwd=$('#password').
 }
 function dashboard(){
  S.theme('',db.colors);
- $('#app').innerHTML=`<header class="app-header"><div class="title-bar"><div class="header-inner"><strong class="app-title" id="admin-title">フレカ管理</strong><div class="header-actions"><span class="header-date" id="last-saved" aria-live="off"></span><button class="hamburger" id="menu-toggle" type="button" aria-label="メニューを開く" aria-expanded="false"><svg class="hamburger-lines" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2" y="5" width="20" height="2"/><rect x="2" y="11" width="20" height="2"/><rect x="2" y="17" width="20" height="2"/></svg></button></div></div></div></header><div class="menu-scrim" id="menu-scrim"></div><nav class="hamburger-panel" id="hamburger-panel" aria-label="管理メニュー"><a href="index.html">公開画面へ切替</a><button data-menu-screen="cards">フレカ管理</button><button data-menu-screen="plans">フレカ印刷メモ</button><button data-menu-screen="colors">カラー設定</button><button id="logout">ログアウト</button></nav><button class="drawer-close" id="drawer-close" type="button" aria-label="メニューを閉じる" aria-hidden="true">×</button><div class="admin-shell"><div id="admin-content" class="animated-content"></div></div><div id="dialog-host"></div>`;
+ $('#app').innerHTML=`<header class="app-header"><div class="title-bar"><div class="header-inner"><strong class="app-title" id="admin-title">フレカ管理</strong><div class="header-actions"><span class="header-date" id="last-saved" aria-live="off"></span><button class="hamburger" id="menu-toggle" type="button" aria-label="メニューを開く" aria-expanded="false"><svg class="hamburger-lines" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2" y="5" width="20" height="2"/><rect x="2" y="11" width="20" height="2"/><rect x="2" y="17" width="20" height="2"/></svg></button></div></div></div></header><div class="menu-scrim" id="menu-scrim"></div><nav class="hamburger-panel" id="hamburger-panel" aria-label="管理メニュー"><a href="index.html">公開画面へ切替</a><button data-menu-screen="cards">フレカ管理</button><button data-menu-screen="colors">カラー設定</button><button id="logout">ログアウト</button></nav><button class="drawer-close" id="drawer-close" type="button" aria-label="メニューを閉じる" aria-hidden="true">×</button><div class="admin-shell"><div id="admin-content" class="animated-content"></div></div><div id="dialog-host"></div>`;
  const menuBtn=$('#menu-toggle'),drawerClose=$('#drawer-close');
  updateLastSaved();
  const positionClose=()=>{const r=menuBtn.getBoundingClientRect();Object.assign(drawerClose.style,{left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px'});};
@@ -113,7 +113,7 @@ function dashboard(){
  $('#menu-toggle').onclick=()=>toggle(!$('#hamburger-panel').classList.contains('is-open'));
  $('#menu-scrim').onclick=()=>toggle(false);
  $('#drawer-close').onclick=()=>toggle(false);
- $$('[data-menu-screen]').forEach(b=>b.onclick=()=>{const screen=b.dataset.menuScreen;mode=screen==='cards'?'cards':'memo';memoTab=screen==='cards'?memoTab:screen;filter='';q='';toggle(false);draw();});
+ $$('[data-menu-screen]').forEach(b=>b.onclick=()=>{const screen=b.dataset.menuScreen;mode=screen==='cards'?'cards':'memo';memoTab='colors';filter='';q='';toggle(false);draw();});
  $('#logout').onclick=()=>{token='';loginScreen();};
  document.addEventListener('keydown',ev=>{if(ev.key==='Escape')toggle(false);});
  draw();
@@ -204,10 +204,12 @@ function setAdminContent(html,preserveFilter){
   button.style.cssText=S.characterStyle(button.dataset.filter||'すべて',db.colors);
  });
 }
-function draw(preserveFilter=false){if(!token)return;S.theme(filter,db.colors);$('#admin-title').textContent=mode==='cards'?'フレカ管理':memoTab==='colors'?'カラー設定':'フレカ印刷メモ';
- $$('[data-menu-screen]').forEach(b=>b.classList.toggle('selected',b.dataset.menuScreen===(mode==='cards'?'cards':memoTab==='colors'?'colors':'plans')));
- setAdminContent(mode==='cards'?renderCards():`${memoTab==='colors'?'':`<div class="sub-tabs"><button class="sub-tab ${memoTab==='owned'?'active':''}" data-tab="owned">所持コーデ</button><button class="sub-tab ${memoTab==='plans'?'active':''}" data-tab="plans">印刷予定</button></div>`}${memoTab==='owned'?renderOwned():memoTab==='plans'?renderPlans():renderColors()}`,preserveFilter);
- $$('[data-tab]').forEach(b=>b.onclick=()=>{memoTab=b.dataset.tab;filter='';q='';draw();});
+function draw(preserveFilter=false){
+ if(!token)return;
+ S.theme(filter,db.colors);
+ $('#admin-title').textContent=mode==='cards'?'フレカ管理':'カラー設定';
+ $$('[data-menu-screen]').forEach(button=>button.classList.toggle('selected',button.dataset.menuScreen===(mode==='cards'?'cards':'colors')));
+ setAdminContent(mode==='cards'?renderCards():renderColors(),preserveFilter);
  const input=$('#search');if(input){
    let composing=false;
    const commit=()=>{const val=input.value;if(q===val)return;q=val;const caret=input.selectionStart??val.length;draw();const fresh=$('#search');if(fresh){fresh.focus({preventScroll:true});try{fresh.setSelectionRange(caret,caret)}catch(_){}}};
@@ -216,11 +218,11 @@ function draw(preserveFilter=false){if(!token)return;S.theme(filter,db.colors);$
    input.addEventListener('input',e=>{if(composing||e.isComposing)return;commit();});
   }
  $$('[data-filter]').forEach(b=>b.onclick=()=>{filter=b.dataset.filter;draw(true);});
- $$('[data-new]').forEach(b=>b.onclick=()=>b.dataset.new==='owned-group'?openOwnershipForm():openForm(b.dataset.new));
+ $$('[data-new]').forEach(b=>b.onclick=()=>openCardForm());
  $$('[data-edit-group]').forEach(b=>b.onclick=()=>openOwnershipForm(b.dataset.editGroup));
  $$('[data-remove-group]').forEach(b=>b.onclick=()=>removeOwnershipGroup(b.dataset.removeGroup));
- $$('[data-edit]').forEach(b=>b.onclick=()=>{const [type,id]=b.dataset.edit.split(':');openForm(type,id);});
- $$('[data-remove]').forEach(b=>b.onclick=()=>{const [type,id]=b.dataset.remove.split(':');remove(type,id);});
+ $$('[data-edit]').forEach(b=>b.onclick=()=>{const [type,id]=b.dataset.edit.split(':');if(type==='cards')openCardForm(id);});
+ $$('[data-remove]').forEach(b=>b.onclick=()=>{const [type,id]=b.dataset.remove.split(':');if(type==='cards')remove(type,id);});
  $$('[data-check]').forEach(b=>b.onchange=()=>{
   const x=db.plans.find(x=>x.id===b.dataset.check);if(!x)return;
   x.done=b.checked;
@@ -229,7 +231,7 @@ function draw(preserveFilter=false){if(!token)return;S.theme(filter,db.colors);$
  });
  $$('[data-view-image]').forEach(b=>b.onclick=()=>{const x=db.cards.find(x=>x.id===b.dataset.viewImage);if(x?.image_url)showImage(x.image_url);});
  hydrateOwnedImages($('#admin-content'));
- if(memoTab==='colors'&&mode==='memo')initColors();}
+ if(mode==='memo')initColors();}
 function showImage(url){$('#dialog-host').innerHTML=`<div class="overlay" id="picture-modal"><img src="${esc(url)}" alt="拡大画像"><button class="overlay-close" id="picture-close">×</button></div>`;$('#picture-close').onclick=()=>$('#dialog-host').innerHTML='';$('#picture-modal').onclick=e=>{if(e.target.id==='picture-modal')$('#dialog-host').innerHTML='';};}
 function closeForm(){$('#dialog-host').innerHTML='';}
 function openOwnershipForm(code=''){
