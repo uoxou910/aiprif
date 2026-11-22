@@ -1,7 +1,21 @@
 (()=>{'use strict';const S=window.SiteD,{$,$$,esc,norm,api,toast,chars,DEFAULT_COLORS,cleanColor,cardImage,uuid}=S;
 let db=S.base(),token='',mode='cards',memoTab='owned',filter='',q='',editing=null,imgBuffer='',busy=false;
 let savedSnapshot=S.base(),saveTail=Promise.resolve(),writeSeq=0,discardThrough=0,pendingWrites=0;
-window.addEventListener('beforeunload',e=>{if(pendingWrites){e.preventDefault();e.returnValue='';}});
+let cardSubmissionInProgress=false;
+function siteACardProgress(message){
+ let element=document.getElementById('site-a-card-progress');
+ if(!element){
+  element=document.createElement('div');
+  element.id='site-a-card-progress';
+  element.setAttribute('role','status');
+  element.setAttribute('aria-live','polite');
+  document.body.appendChild(element);
+ }
+ element.textContent=message;
+}
+function hideSiteACardProgress(){document.getElementById('site-a-card-progress')?.remove();}
+function siteACardBusy(){if(!cardSubmissionInProgress)return false;toast('フレカを保存中です。完了後に操作してください');return true;}
+window.addEventListener('beforeunload',e=>{if(pendingWrites||cardSubmissionInProgress){e.preventDefault();e.returnValue='';}});
 const authKey='site_a_demo_auth_verifier';
 function localVerifier(password){return 'demo-'+password;} // Only a UI gate, NEVER a security boundary.
 // Original images for local demo are stored as File/Blob in IndexedDB.
@@ -113,8 +127,8 @@ function dashboard(){
  $('#menu-toggle').onclick=()=>toggle(!$('#hamburger-panel').classList.contains('is-open'));
  $('#menu-scrim').onclick=()=>toggle(false);
  $('#drawer-close').onclick=()=>toggle(false);
- $$('[data-menu-screen]').forEach(b=>b.onclick=()=>{const screen=b.dataset.menuScreen;mode=screen==='cards'?'cards':'memo';memoTab='colors';filter='';q='';toggle(false);draw();});
- $('#logout').onclick=()=>{token='';loginScreen();};
+ $$('[data-menu-screen]').forEach(b=>b.onclick=()=>{if(siteACardBusy())return;const screen=b.dataset.menuScreen;mode=screen==='cards'?'cards':'memo';memoTab='colors';filter='';q='';toggle(false);draw();});
+ $('#logout').onclick=()=>{if(siteACardBusy()||pendingWrites){toast('保存処理が完了してからログアウトしてください');return;}token='';loginScreen();};
  document.addEventListener('keydown',ev=>{if(ev.key==='Escape')toggle(false);});
  draw();
 }
@@ -427,13 +441,14 @@ function setupSiteACardSuggestions(root,entries){
 }
 
 function openCardForm(id=''){
+ if(siteACardBusy())return;
  const existing=db.cards.find(x=>x.id===id);
  const defaultChara=existing?.chara||filter||'';
  let entries=existing?[{key:uuid(),id:existing.id,code:existing.code||'',chara:defaultChara,image:existing.image_url||''}]:[];
  const single=!!existing,demo=S.isDemo();
  let submitting=false;
  const previewUrls=new Set();
- const closeCard=()=>{for(const u of previewUrls)URL.revokeObjectURL(u);previewUrls.clear();closeForm();};
+ const closeCard=()=>{root._siteACardSuggestionsAbort?.abort();for(const u of previewUrls)URL.revokeObjectURL(u);previewUrls.clear();closeForm();};
  const fileInput='<input id="card-files" type="file" accept="image/png,image/jpeg,image/webp,image/gif" '+(single?'':'multiple')+' hidden>'; 
  const urlMode='';
  $('#dialog-host').innerHTML=`<div class="dialog-shade" id="dialog-shade"><section class="dialog card-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><div class="row between dialog-heading"><h2 id="dialog-title">${single?'フレカを編集':'フレカを追加'}</h2><button class="dialog-x" id="dialog-close" type="button" aria-label="閉じる">×</button></div><form id="card-form"><div class="card-upload-zone" id="upload-zone" role="button" tabindex="0"><span class="upload-symbol">＋</span><strong>画像を選択</strong><span class="upload-hint">またはここにドロップ</span></div>${fileInput}${urlMode}<div id="upload-entries" class="upload-entries"></div><div class="dialog-actions ${single?'':'hidden'}" id="card-submit-actions"><button class="btn primary" type="submit">保存</button></div></form></section></div>`;
@@ -541,7 +556,7 @@ async function resizeOwnedImage(file){
  });
 }
 async function resize(file){if(!file.type.startsWith('image/'))throw Error('画像を指定してください');if(file.size>16*1024*1024)throw Error('画像は16MB以下にしてください');return new Promise((resolve,reject)=>{const r=new FileReader();r.onerror=()=>reject(Error('画像を読み込めません'));r.onload=()=>{const image=new Image();image.onerror=()=>reject(Error('画像形式が不正です'));image.onload=()=>{const canvas=document.createElement('canvas');const ratio=Math.min(1,900/Math.max(image.width,image.height));canvas.width=Math.max(1,Math.round(image.width*ratio));canvas.height=Math.max(1,Math.round(image.height*ratio));canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);resolve(canvas.toDataURL('image/jpeg',.76));};image.src=r.result;};r.readAsDataURL(file);});}
-async function remove(type,id){const list=db[type],idx=list.findIndex(x=>x.id===id);if(idx<0||!confirm('「'+list[idx].code+'」を削除しますか？'))return;const backup=JSON.stringify(db);list.splice(idx,1);if(type==='cards')db.lastCardsUpdated=new Date().toISOString();save();draw();}
+async function remove(type,id){if(siteACardBusy())return;const list=db[type],idx=list.findIndex(x=>x.id===id);if(idx<0||!confirm('「'+list[idx].code+'」を削除しますか？'))return;const backup=JSON.stringify(db);list.splice(idx,1);if(type==='cards')db.lastCardsUpdated=new Date().toISOString();save();draw();}
 function initColors(){
  const pending=JSON.parse(JSON.stringify(db.colors));
  const get=c=>S.colorSpec(pending[c],DEFAULT_COLORS[c]);
