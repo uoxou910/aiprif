@@ -342,8 +342,8 @@ function draw(preserveFilter=false){
  $$('[data-edit-group]').forEach(b=>b.onclick=()=>openOwnershipForm(b.dataset.editGroup));
  $$('[data-remove-group]').forEach(b=>b.onclick=()=>removeOwnershipGroup(b.dataset.removeGroup));
  $$('[data-edit]').forEach(b=>b.onclick=()=>{const [type,id]=b.dataset.edit.split(':');if(type==='cards')openCardForm(id);});
- $('[data-remove]').forEach(b=>b.onclick=()=>{const [type,id]=b.dataset.remove.split(':');if(type==='cards')remove(type,id);});
- $('[data-visibility]').forEach(b=>b.onclick=()=>toggleCardVisibility(b.dataset.visibility));
+ $$('[data-remove]').forEach(b=>b.onclick=()=>{const [type,id]=b.dataset.remove.split(':');if(type==='cards')remove(type,id);});
+ $$('[data-visibility]').forEach(b=>b.onclick=()=>toggleCardVisibility(b.dataset.visibility));
  $$('[data-check]').forEach(b=>b.onchange=()=>{
   const x=db.plans.find(x=>x.id===b.dataset.check);if(!x)return;
   x.done=b.checked;
