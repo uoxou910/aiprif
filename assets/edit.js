@@ -319,9 +319,116 @@ function openForm(type,id=''){
  const backup=JSON.stringify(db);if(row)Object.assign(row,item);else source.push(item);
  save(isPlan?'upsertPlan':'save',isPlan?{plan:item}:{});closeForm();draw();};
 }
+
+/* Editable live suggestions for Site A card names (limited to Site A's four characters). */
+function siteANameCandidates(kind,entries,currentKey){
+ const values=kind==='chara'?[...chars]:[];
+ const rows=[...db.cards,...entries.filter(x=>x.key!==currentKey)];
+ for(const row of rows)values.push(String(row?.[kind]||'').trim());
+ const seen=new Set();
+ return values.filter(value=>{
+  const key=norm(value);
+  if(!key||seen.has(key))return false;
+  seen.add(key);
+  return true;
+ });
+}
+function setupSiteACardSuggestions(root,entries){
+ root._siteACardSuggestionsAbort?.abort();
+ const controller=new AbortController();
+ root._siteACardSuggestionsAbort=controller;
+ let popup=$('#site-a-card-name-popup',root);
+ if(!popup){
+  popup=document.createElement('div');
+  popup.id='site-a-card-name-popup';
+  popup.className='site-a-name-popup';
+  popup.setAttribute('role','listbox');
+  root.appendChild(popup);
+ }
+ popup.hidden=true;popup.innerHTML='';
+ let field=null,matched=[],selected=-1;
+ const hide=()=>{
+  popup.hidden=true;popup.innerHTML='';matched=[];selected=-1;
+  if(field){field.setAttribute('aria-expanded','false');field.removeAttribute('aria-activedescendant');}
+ };
+ const place=()=>{
+  if(popup.hidden||!field?.isConnected)return;
+  const rect=field.getBoundingClientRect();
+  popup.style.left=Math.max(8,rect.left)+'px';
+  popup.style.top=(rect.bottom+4)+'px';
+  popup.style.width=Math.min(rect.width,innerWidth-16)+'px';
+  popup.style.maxHeight=Math.max(40,Math.min(214,innerHeight-rect.bottom-14))+'px';
+ };
+ const pick=value=>{
+  const input=field;
+  if(!input?.isConnected)return hide();
+  input.value=value;
+  input.dispatchEvent(new Event('input',{bubbles:true}));
+  input.focus({preventScroll:true});
+  input.setSelectionRange(value.length,value.length);
+  hide();
+ };
+ const show=input=>{
+  field=input;
+  const query=norm(input.value);
+  if(!query)return hide();
+  const kind=input.dataset.code?'code':'chara';
+  const key=input.dataset.code||input.dataset.chara;
+  matched=siteANameCandidates(kind,entries,key)
+   .filter(value=>norm(value).includes(query))
+   .sort((a,b)=>Number(!norm(a).startsWith(query))-Number(!norm(b).startsWith(query)))
+   .slice(0,10);
+  if(!matched.length)return hide();
+  selected=-1;
+  popup.innerHTML=matched.map((value,i)=>`<button type="button" role="option" id="site-a-name-option-${i}" aria-selected="false" class="site-a-name-option" data-suggestion="${i}">${esc(value)}</button>`).join('');
+  popup.hidden=false;
+  input.setAttribute('aria-expanded','true');
+  $$('[data-suggestion]',popup).forEach(button=>{
+   button.onmousedown=e=>e.preventDefault();
+   button.onclick=()=>pick(matched[Number(button.dataset.suggestion)]);
+  });
+  place();
+ };
+ const highlight=()=>{
+  $$('[data-suggestion]',popup).forEach((button,i)=>{
+   const on=i===selected;
+   button.classList.toggle('is-active',on);
+   button.setAttribute('aria-selected',String(on));
+   if(on){field.setAttribute('aria-activedescendant',button.id);button.scrollIntoView({block:'nearest'});}
+  });
+  if(selected<0)field.removeAttribute('aria-activedescendant');
+ };
+ $$('input[data-code],input[data-chara]',root).forEach(input=>{
+  input.setAttribute('role','combobox');
+  input.setAttribute('aria-autocomplete','list');
+  input.setAttribute('aria-controls',popup.id);
+  input.setAttribute('aria-expanded','false');
+  input.autocomplete='off';
+  input.addEventListener('input',()=>show(input));
+  input.addEventListener('focus',()=>show(input));
+  input.addEventListener('keydown',e=>{
+   if(e.isComposing||e.keyCode===229||field!==input||popup.hidden)return;
+   if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+    e.preventDefault();
+    selected=e.key==='ArrowDown'?(selected+1)%matched.length:(selected-1+matched.length)%matched.length;
+    highlight();
+   }else if(e.key==='Enter'){
+    e.preventDefault();e.stopPropagation();
+    pick(matched[selected>=0?selected:0]);
+   }else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();hide();}
+   else if(e.key==='Tab')hide();
+  });
+  input.addEventListener('blur',()=>setTimeout(()=>{if(field===input&&!popup.contains(document.activeElement))hide();},100));
+ });
+ const reposition=()=>{if(!popup.hidden){if(field?.isConnected)place();else hide();}};
+ root.addEventListener('scroll',reposition,{passive:true,capture:true,signal:controller.signal});
+ window.addEventListener('scroll',reposition,{passive:true,signal:controller.signal});
+ window.addEventListener('resize',reposition,{passive:true,signal:controller.signal});
+}
+
 function openCardForm(id=''){
  const existing=db.cards.find(x=>x.id===id);
- const defaultChara=existing?.chara||filter||chars[0];
+ const defaultChara=existing?.chara||filter||'';
  let entries=existing?[{key:uuid(),id:existing.id,code:existing.code||'',chara:defaultChara,image:existing.image_url||''}]:[];
  const single=!!existing,demo=S.isDemo();
  let submitting=false;
@@ -332,11 +439,12 @@ function openCardForm(id=''){
  $('#dialog-host').innerHTML=`<div class="dialog-shade" id="dialog-shade"><section class="dialog card-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><div class="row between dialog-heading"><h2 id="dialog-title">${single?'フレカを編集':'フレカを追加'}</h2><button class="dialog-x" id="dialog-close" type="button" aria-label="閉じる">×</button></div><form id="card-form"><div class="card-upload-zone" id="upload-zone" role="button" tabindex="0"><span class="upload-symbol">＋</span><strong>画像を選択</strong><span class="upload-hint">またはここにドロップ</span></div>${fileInput}${urlMode}<div id="upload-entries" class="upload-entries"></div><div class="dialog-actions ${single?'':'hidden'}" id="card-submit-actions"><button class="btn primary" type="submit">保存</button></div></form></section></div>`;
  const root=$('#dialog-host');
  const paint=()=>{
-  $('#upload-entries').innerHTML=entries.map((row,i)=>`<div class="upload-entry" data-entry="${esc(row.key)}"><div class="upload-thumb">${row.image?`<img src="${esc(row.image)}" alt="画像プレビュー">`:'<span>画像なし</span>'}</div><div class="upload-fields"><input data-code="${esc(row.key)}" maxlength="120" aria-label="${i+1}件目のコーデ名" placeholder="コーデ名" value="${esc(row.code)}" required><select data-chara="${esc(row.key)}" aria-label="${i+1}件目のマイキャラ">${chars.map(c=>`<option value="${esc(c)}" ${c===row.chara?'selected':''}>${esc(c)}</option>`).join('')}</select></div>${!single&&entries.length>1?`<button type="button" data-remove-entry="${esc(row.key)}" class="upload-remove" aria-label="${i+1}件目を削除">×</button>`:''}</div>`).join('');
+  $('#upload-entries').innerHTML=entries.map((row,i)=>`<div class="upload-entry" data-entry="${esc(row.key)}"><div class="upload-thumb">${row.image?`<img src="${esc(row.image)}" alt="画像プレビュー">`:'<span>画像なし</span>'}</div><div class="upload-fields"><input data-code="${esc(row.key)}" maxlength="120" aria-label="${i+1}件目のコーデ名" placeholder="コーデ名" value="${esc(row.code)}" required><input type="text" data-chara="${esc(row.key)}" aria-label="${i+1}件目のキャラ名" placeholder="キャラ名" maxlength="120" value="${esc(row.chara)}" required></div>${!single&&entries.length>1?`<button type="button" data-remove-entry="${esc(row.key)}" class="upload-remove" aria-label="${i+1}件目を削除">×</button>`:''}</div>`).join('');
   $('#card-submit-actions').classList.toggle('hidden',entries.length===0);
   $$('[data-code]',root).forEach(el=>el.addEventListener('input',()=>{const row=entries.find(x=>x.key===el.dataset.code);if(row)row.code=el.value;}));
-  $$('[data-chara]',root).forEach(el=>el.addEventListener('change',()=>{const row=entries.find(x=>x.key===el.dataset.chara);if(row)row.chara=el.value;}));
+  $$('[data-chara]',root).forEach(el=>el.addEventListener('input',()=>{const row=entries.find(x=>x.key===el.dataset.chara);if(row)row.chara=el.value;}));
   $$('[data-remove-entry]',root).forEach(b=>b.onclick=()=>{entries=entries.filter(x=>x.key!==b.dataset.removeEntry);paint();});
+  setupSiteACardSuggestions(root,entries);
  };
  const addFiles=async files=>{
   const list=[...files];if(!list.length)return;
@@ -348,7 +456,7 @@ function openCardForm(id=''){
    const img=demo?await resize(file):URL.createObjectURL(file);
    if(!demo)previewUrls.add(img);
    if(single){entries[0].image=img;entries[0].file=demo?null:file;}
-   else entries.push({key:uuid(),id:'',code:'',chara:filter||chars[0],image:img,file:demo?null:file});
+   else entries.push({key:uuid(),id:'',code:'',chara:filter||'',image:img,file:demo?null:file});
   }catch(err){toast(err.message);}}
   if(zone.isConnected)zone.classList.remove('upload-busy');
   paint();$('#upload-entries [data-code]')?.focus();
