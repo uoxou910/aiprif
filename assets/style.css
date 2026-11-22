@@ -729,14 +729,20 @@ body[data-page="edit"] .admin-shell .search:focus-within {
  .ownership-image-preview img{max-height:145px}
 }
 
-/* Site A mobile public view: compact search (3/4) and character bar (3/5). */
+/* Site A only: scale the complete mobile search dock and bottom character bar. */
 @media (max-width:699px) {
+  body[data-page="view"] .search-dock {
+    padding-top:13.5px;
+    padding-bottom:13.5px;
+  }
   body[data-page="view"] .search-dock > .search {
     height:39px;
     min-height:39px;
   }
   body[data-page="view"] .bottom-nav {
-    height:46px;
+    height:calc(46px + env(safe-area-inset-bottom,0px));
+    padding-bottom:env(safe-area-inset-bottom,0px);
+    box-sizing:border-box;
   }
   body[data-page="view"] .bottom-nav-inner {
     height:46px;
