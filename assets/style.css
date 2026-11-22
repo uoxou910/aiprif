@@ -780,3 +780,55 @@ body[data-page="edit"] .admin-shell .search:focus-within {
     box-shadow:0 9px 28px rgba(39,32,49,.17),inset 0 -2px #777086;
   }
 }
+
+/* Site A card management: inline searchable, editable name candidates. */
+body[data-page="edit"] .site-a-name-popup {
+ position:fixed;
+ z-index:95;
+ box-sizing:border-box;
+ display:block;
+ padding:5px;
+ overflow-y:auto;
+ overscroll-behavior:contain;
+ border:1px solid #e4e0e9;
+ border-radius:11px;
+ background:#fff;
+ box-shadow:0 10px 28px rgba(35,29,42,.17);
+}
+body[data-page="edit"] .site-a-name-popup[hidden] {display:none!important;}
+body[data-page="edit"] .site-a-name-option {
+ display:block;width:100%;
+ padding:10px 12px;
+ border:0;border-radius:7px;
+ background:transparent;
+ color:#302a35;
+ font-size:14px;line-height:1.5;
+ text-align:left;
+ overflow-wrap:anywhere;
+ cursor:pointer;
+}
+body[data-page="edit"] .site-a-name-option:hover,
+body[data-page="edit"] .site-a-name-option.is-active {background:#f0edf5;}
+@media(max-width:699px){
+ body[data-page="edit"] .site-a-name-option {font-size:16px;}
+}
+/* Saving continues after the card editor closes; do not mistake UI closure for completion. */
+body[data-page="edit"] #site-a-card-progress {
+ position:fixed;
+ left:50%;
+ bottom:calc(22px + env(safe-area-inset-bottom,0px));
+ transform:translateX(-50%);
+ z-index:120;
+ box-sizing:border-box;
+ max-width:calc(100vw - 32px);
+ min-width:min(320px,calc(100vw - 32px));
+ padding:12px 18px;
+ border-radius:15px;
+ background:rgba(42,37,48,.96);
+ box-shadow:0 9px 35px rgba(30,24,39,.21);
+ color:#fff;
+ font-size:12px;
+ line-height:1.55;
+ text-align:center;
+ pointer-events:none;
+}
