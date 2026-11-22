@@ -476,21 +476,21 @@ function openCardForm(id=''){
   bulkCheck.onchange=()=>{copyFirstChara=bulkCheck.checked;syncFirstChara();};
   syncFirstChara();
   $('#card-submit-actions').classList.toggle('hidden',entries.length===0);
-  $('[data-code]',root).forEach(el=>el.addEventListener('input',()=>{const row=entries.find(x=>x.key===el.dataset.code);if(row)row.code=el.value;}));
-  $('[data-chara]',root).forEach((el,i)=>el.addEventListener('input',()=>{
+  $$('[data-code]',root).forEach(el=>el.addEventListener('input',()=>{const row=entries.find(x=>x.key===el.dataset.code);if(row)row.code=el.value;}));
+  $$('[data-chara]',root).forEach((el,i)=>el.addEventListener('input',()=>{
    const row=entries.find(x=>x.key===el.dataset.chara);if(row)row.chara=el.value;
    if(copyFirstChara){
     if(i===0)syncFirstChara();
     else{copyFirstChara=false;bulkCheck.checked=false;}
    }
   }));
-  $('[data-mikuko]',root).forEach(el=>el.onchange=()=>{
+  $$('[data-mikuko]',root).forEach(el=>el.onchange=()=>{
    const row=entries.find(x=>x.key===el.dataset.mikuko);
    if(row)row.mikuko=el.checked;
   });
   const editMikuko=$('#site-a-edit-mikuko');
   if(single&&editMikuko)editMikuko.onchange=()=>{entries[0].mikuko=editMikuko.checked;};
-  $('[data-remove-entry]',root).forEach(b=>b.onclick=()=>{entries=entries.filter(x=>x.key!==b.dataset.removeEntry);paint();});
+  $$('[data-remove-entry]',root).forEach(b=>b.onclick=()=>{entries=entries.filter(x=>x.key!==b.dataset.removeEntry);paint();});
   setupSiteACardSuggestions(root,entries);
  };
  const addFiles=async files=>{
