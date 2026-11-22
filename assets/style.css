@@ -757,3 +757,26 @@ body[data-page="edit"] .admin-shell .search:focus-within {
     padding-bottom:calc(70px + env(safe-area-inset-bottom,0px));
   }
 }
+
+/* Site A mobile viewer: only the search field floats; no opaque sticky band. */
+@media (max-width:699px) {
+  body[data-page="view"] .search-dock {
+    background:transparent;
+    border:0;
+    box-shadow:none;
+    -webkit-backdrop-filter:none;
+    backdrop-filter:none;
+  }
+  body[data-page="view"] .search-dock > .search {
+    position:relative;
+    background:rgba(250,249,252,.86);
+    border-radius:var(--radius-medium);
+    box-shadow:0 8px 26px rgba(39,32,49,.14),0 2px 7px rgba(39,32,49,.05);
+    -webkit-backdrop-filter:blur(17px) saturate(1.15);
+    backdrop-filter:blur(17px) saturate(1.15);
+  }
+  body[data-page="view"] .search-dock > .search:focus-within {
+    background:rgba(250,248,253,.92);
+    box-shadow:0 9px 28px rgba(39,32,49,.17),inset 0 -2px #777086;
+  }
+}
