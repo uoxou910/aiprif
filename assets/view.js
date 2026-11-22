@@ -18,7 +18,8 @@ function initialPublicColors(){
  }catch(_){}
  return initial;
 }
-let cards=[],colors=initialPublicColors(),character='',query='',page=1,lastCardsUpdated='';const PAGE=20;
+let cards=[],colors=initialPublicColors(),character='',query='',page=1,lastCardsUpdated='';const wideGrid=window.matchMedia('(min-width: 1400px)');
+let PAGE=wideGrid.matches?24:20;
 function dateUpdate(){
  const timestamps=[Date.parse(lastCardsUpdated||''),...cards.map(x=>Date.parse(x.updated_at||x.created_at||''))].filter(Number.isFinite);
  if(!timestamps.length)return '更新:未記録';
@@ -43,6 +44,14 @@ $('#drawer-close').onclick=()=>toggleMenu(false);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')toggleMenu(false);});
 const navRoot=$('#character-navigation');
 const nav=buildCharacterNav(c=>{character=c;page=1;render();},{colors});navRoot.innerHTML=nav.html;const navActions=nav.init(navRoot);
+// At six columns, use four complete rows (24 cards) instead of 20 (6/6/6/2).
+// All other layouts retain the existing 20-card page size.
+wideGrid.addEventListener('change',()=>{
+ const oldPageSize=PAGE;
+ PAGE=wideGrid.matches?24:20;
+ page=Math.floor((page-1)*oldPageSize/PAGE)+1;
+ render();
+});
 function pages(current,total){if(total<=7)return Array.from({length:total},(_,i)=>i+1);const out=[1];let a=Math.max(2,current-1),b=Math.min(total-1,current+1);if(current<=3){a=2;b=4;}else if(current>=total-2){a=total-3;b=total-1;}if(a>2)out.push('…');for(let i=a;i<=b;i++)out.push(i);if(b<total-1)out.push('…');out.push(total);return out;}
 function render(){const filtered=cards.filter(x=>(!character||x.chara===character)&&(!query||norm(x.code).includes(norm(query))));const total=Math.max(1,Math.ceil(filtered.length/PAGE));page=Math.min(page,total);const rows=filtered.slice((page-1)*PAGE,page*PAGE);
 $('#grid').innerHTML=rows.length?rows.map((x,i)=>`<article class="freca-card" data-id="${esc(x.id)}" style="--stagger:${Math.min(rows.indexOf(x),9)*32}ms"><div class="card-picture" data-id="${esc(x.id)}">${i<2&&x.image_url?`<img src="${esc(x.image_url)}" alt="${esc(x.code)}" loading="eager" fetchpriority="high" decoding="async">`:cardImage(x.image_url,x.code)}</div><div class="card-detail"><div class="card-chara">${esc(x.chara)}</div><div class="card-code">${esc(x.code)}</div></div></article>`).join(''):'<div class="placeholder-panel">カードがありません</div>';
