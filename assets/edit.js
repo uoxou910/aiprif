@@ -1,7 +1,14 @@
 (()=>{'use strict';const S=window.SiteD,{$,$$,esc,norm,api,toast,chars,DEFAULT_COLORS,cleanColor,cardImage,uuid}=S;
-let db=S.base(),token='',mode='cards',memoTab='owned',filter='',q='',editing=null,imgBuffer='',busy=false;
+let db=S.base(),token='',mode='cards',memoTab='owned',filter='',q='',mikukoOnly=false,editing=null,imgBuffer='',busy=false;
 let savedSnapshot=S.base(),saveTail=Promise.resolve(),writeSeq=0,discardThrough=0,pendingWrites=0;
 let cardSubmissionInProgress=false;
+const MIKUKO_CODE_MARK='\u2064\u2064\u2064';
+const siteAMikukoCode=code=>{
+ const text=String(code??'');
+ return text.endsWith(MIKUKO_CODE_MARK)?text.slice(0,-MIKUKO_CODE_MARK.length):text;
+};
+const siteAMikukoFlag=code=>String(code??'').endsWith(MIKUKO_CODE_MARK);
+const siteAMikukoEncode=(code,mikuko)=>siteAMikukoCode(code)+(mikuko?MIKUKO_CODE_MARK:'');
 function siteACardProgress(message){
  let element=document.getElementById('site-a-card-progress');
  if(!element){
@@ -180,7 +187,7 @@ function save(action='save',payload={}){
 }
 function filterbar(placeholder){return `<label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 5 5"/></svg><input id="search" type="search" placeholder="${esc(placeholder)}" autocomplete="off" value="${esc(q)}"></label>`;}
 function charOptions(){return `<div class="character-filter" id="filter-row" aria-label="キャラクターを絞り込み"><button class="filter-pill filter-all ${!filter?'active':''}" data-filter="" style="${S.characterStyle('すべて',db.colors)}">すべて</button><div class="filter-scroll" tabindex="0" aria-label="左右にスクロールしてキャラクターを選択">${chars.map(c=>`<button class="filter-pill ${filter===c?'active':''}" data-filter="${esc(c)}" style="${S.characterStyle(c,db.colors)}">${esc(c)}</button>`).join('')}</div></div>`;}
-function renderCards(){const rows=db.cards.filter(x=>(!filter||x.chara===filter)&&norm(x.code).includes(norm(q)));return `<div class="section-head"><h2>フレカ一覧 <small class="note">${rows.length}件</small></h2><button class="btn primary" data-new="cards">＋ フレカを追加</button></div>${filterbar('コーデ名で検索')}${charOptions()}<div class="admin-card-grid">${rows.length?rows.map(x=>`<article class="admin-card"><div class="admin-image" data-view-image="${esc(x.id)}">${cardImage(x.image_url,x.code)}</div><div class="admin-card-body"><div class="admin-title">${esc(x.code)}</div><div class="admin-sub">${esc(x.chara)}</div><div class="row"><button class="tiny-btn" data-edit="cards:${esc(x.id)}">編集</button><button class="tiny-btn danger" data-remove="cards:${esc(x.id)}">削除</button></div></div></article>`).join(''):'<div class="placeholder-panel">フレカがありません</div>'}</div>`;}
+function renderCards(){const rows=db.cards.filter(x=>(!filter||x.chara===filter)&&(!mikukoOnly||siteAMikukoFlag(x.code))&&norm(siteAMikukoCode(x.code)).includes(norm(q)));return `<div class="section-head"><h2>フレカ一覧 <small class="note">${rows.length}件</small></h2><button class="btn primary" data-new="cards">＋ フレカを追加</button></div><div class="site-a-mikuko-search-row">${filterbar('コーデ名で検索')}<label class="site-a-mikuko-check site-a-mikuko-search-check"><input type="checkbox" id="site-a-mikuko-only" ${mikukoOnly?'checked':''}>ミクコ</label></div>${charOptions()}<div class="admin-card-grid">${rows.length?rows.map(x=>`<article class="admin-card"><div class="admin-image" data-view-image="${esc(x.id)}">${cardImage(x.image_url,siteAMikukoCode(x.code))}</div><div class="admin-card-body"><div class="admin-title">${esc(siteAMikukoCode(x.code))}</div><div class="admin-sub">${esc(x.chara)}</div><div class="row"><button class="tiny-btn" data-edit="cards:${esc(x.id)}">編集</button><button class="tiny-btn danger" data-remove="cards:${esc(x.id)}">削除</button></div></div></article>`).join(''):'<div class="placeholder-panel">フレカがありません</div>'}</div>`;}
 function ownershipRows(){const rows=[...db.owned.map(x=>({...x,source:'owned'})),...db.plans.filter(x=>x.done).map(x=>({...x,source:'plans'}))];const map=new Map();for(const x of rows){const k=norm(x.code)+'|'+x.chara;if(!map.has(k))map.set(k,x);else if(x.source==='owned')map.set(k,x);}return [...map.values()];}
 function renderOwned(){
  const rows=ownershipRows().filter(x=>(!filter||x.chara===filter)&&norm(x.code).includes(norm(q)));
@@ -224,6 +231,7 @@ function draw(preserveFilter=false){
  $('#admin-title').textContent=mode==='cards'?'フレカ管理':'カラー設定';
  $$('[data-menu-screen]').forEach(button=>button.classList.toggle('selected',button.dataset.menuScreen===(mode==='cards'?'cards':'colors')));
  setAdminContent(mode==='cards'?renderCards():renderColors(),preserveFilter);
+ const mikukoCheckbox=$('#site-a-mikuko-only');if(mikukoCheckbox)mikukoCheckbox.onchange=e=>{mikukoOnly=e.target.checked;draw(true);};
  const input=$('#search');if(input){
    let composing=false;
    const commit=()=>{const val=input.value;if(q===val)return;q=val;const caret=input.selectionStart??val.length;draw();const fresh=$('#search');if(fresh){fresh.focus({preventScroll:true});try{fresh.setSelectionRange(caret,caret)}catch(_){}}};
@@ -338,7 +346,7 @@ function openForm(type,id=''){
 function siteANameCandidates(kind,entries,currentKey){
  const values=kind==='chara'?[...chars]:[];
  const rows=[...db.cards,...entries.filter(x=>x.key!==currentKey)];
- for(const row of rows)values.push(String(row?.[kind]||'').trim());
+ for(const row of rows)values.push((kind==='code'?siteAMikukoCode(row?.code):String(row?.[kind]||'')).trim());
  const seen=new Set();
  return values.filter(value=>{
   const key=norm(value);
@@ -444,14 +452,14 @@ function openCardForm(id=''){
  if(siteACardBusy())return;
  const existing=db.cards.find(x=>x.id===id);
  const defaultChara=existing?.chara||filter||'';
- let entries=existing?[{key:uuid(),id:existing.id,code:existing.code||'',chara:defaultChara,image:existing.image_url||''}]:[];
+ let entries=existing?[{key:uuid(),id:existing.id,code:siteAMikukoCode(existing.code),chara:defaultChara,mikuko:siteAMikukoFlag(existing.code),image:existing.image_url||''}]:[];
  const single=!!existing,demo=S.isDemo();
  let submitting=false,copyFirstChara=false;
  const previewUrls=new Set();
  const closeCard=()=>{root._siteACardSuggestionsAbort?.abort();for(const u of previewUrls)URL.revokeObjectURL(u);previewUrls.clear();closeForm();};
  const fileInput='<input id="card-files" type="file" accept="image/png,image/jpeg,image/webp,image/gif" '+(single?'':'multiple')+' hidden>'; 
  const urlMode='';
- $('#dialog-host').innerHTML=`<div class="dialog-shade" id="dialog-shade"><section class="dialog card-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><div class="row between dialog-heading"><h2 id="dialog-title">${single?'フレカを編集':'フレカを追加'}</h2><button class="dialog-x" id="dialog-close" type="button" aria-label="閉じる">×</button></div><form id="card-form"><div class="card-upload-zone" id="upload-zone" role="button" tabindex="0"><span class="upload-symbol">＋</span><strong>画像を選択</strong><span class="upload-hint">またはここにドロップ</span></div>${fileInput}${urlMode}<label id="site-a-chara-copy-row" class="card-chara-bulk hidden"><input type="checkbox" id="site-a-chara-copy">一番上のキャラ名を全てのキャラ名欄に反映する</label><div id="upload-entries" class="upload-entries"></div><div class="dialog-actions ${single?'':'hidden'}" id="card-submit-actions"><button class="btn primary" type="submit">保存</button></div></form></section></div>`;
+ $('#dialog-host').innerHTML=`<div class="dialog-shade" id="dialog-shade"><section class="dialog card-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><div class="row between dialog-heading site-a-card-heading"><h2 id="dialog-title">${single?'フレカを編集':'フレカを追加'}</h2><div class="site-a-card-heading-right">${single?`<label class="site-a-mikuko-check"><input type="checkbox" id="site-a-edit-mikuko" ${entries[0].mikuko?'checked':''}>ミクコ</label>`:''}<button class="dialog-x" id="dialog-close" type="button" aria-label="閉じる">×</button></div></div><form id="card-form"><div class="card-upload-zone" id="upload-zone" role="button" tabindex="0"><span class="upload-symbol">＋</span><strong>画像を選択</strong><span class="upload-hint">またはここにドロップ</span></div>${fileInput}${urlMode}<label id="site-a-chara-copy-row" class="card-chara-bulk hidden"><input type="checkbox" id="site-a-chara-copy">一番上のキャラ名を全てのキャラ名欄に反映する</label><div id="upload-entries" class="upload-entries"></div><div class="dialog-actions ${single?'':'hidden'}" id="card-submit-actions"><button class="btn primary" type="submit">保存</button></div></form></section></div>`;
  const root=$('#dialog-host');
  const syncFirstChara=()=>{
   if(!copyFirstChara||entries.length<2)return;
@@ -461,7 +469,7 @@ function openCardForm(id=''){
  };
  const paint=()=>{
   if(entries.length<2)copyFirstChara=false;
-  $('#upload-entries').innerHTML=entries.map((row,i)=>`<div class="upload-entry" data-entry="${esc(row.key)}"><div class="upload-thumb">${row.image?`<img src="${esc(row.image)}" alt="画像プレビュー">`:'<span>画像なし</span>'}</div><div class="upload-fields"><input type="text" data-chara="${esc(row.key)}" aria-label="${i+1}件目のキャラ名" placeholder="キャラ名" maxlength="120" value="${esc(row.chara)}" required><input data-code="${esc(row.key)}" maxlength="120" aria-label="${i+1}件目のコーデ名" placeholder="コーデ名" value="${esc(row.code)}" required></div>${!single&&entries.length>1?`<button type="button" data-remove-entry="${esc(row.key)}" class="upload-remove" aria-label="${i+1}件目を削除">×</button>`:''}</div>`).join('');
+  $('#upload-entries').innerHTML=entries.map((row,i)=>`<div class="upload-entry" data-entry="${esc(row.key)}"><div class="upload-thumb">${row.image?`<img src="${esc(row.image)}" alt="画像プレビュー">`:'<span>画像なし</span>'}</div><div class="upload-fields"><input type="text" data-chara="${esc(row.key)}" aria-label="${i+1}件目のキャラ名" placeholder="キャラ名" maxlength="120" value="${esc(row.chara)}" required><input data-code="${esc(row.key)}" maxlength="120" aria-label="${i+1}件目のコーデ名" placeholder="コーデ名" value="${esc(row.code)}" required></div>${!single?`<label class="site-a-mikuko-check site-a-upload-mikuko"><input type="checkbox" data-mikuko="${esc(row.key)}" ${row.mikuko?'checked':''}>ミクコ</label>`:''}${!single&&entries.length>1?`<button type="button" data-remove-entry="${esc(row.key)}" class="upload-remove" aria-label="${i+1}件目を削除">×</button>`:''}</div>`).join('');
   const bulkRow=$('#site-a-chara-copy-row'),bulkCheck=$('#site-a-chara-copy');
   bulkRow.classList.toggle('hidden',single||entries.length<2);
   bulkCheck.checked=copyFirstChara;
@@ -476,7 +484,13 @@ function openCardForm(id=''){
     else{copyFirstChara=false;bulkCheck.checked=false;}
    }
   }));
-  $$('[data-remove-entry]',root).forEach(b=>b.onclick=()=>{entries=entries.filter(x=>x.key!==b.dataset.removeEntry);paint();});
+  $('[data-mikuko]',root).forEach(el=>el.onchange=()=>{
+   const row=entries.find(x=>x.key===el.dataset.mikuko);
+   if(row)row.mikuko=el.checked;
+  });
+  const editMikuko=$('#site-a-edit-mikuko');
+  if(single&&editMikuko)editMikuko.onchange=()=>{entries[0].mikuko=editMikuko.checked;};
+  $('[data-remove-entry]',root).forEach(b=>b.onclick=()=>{entries=entries.filter(x=>x.key!==b.dataset.removeEntry);paint();});
   setupSiteACardSuggestions(root,entries);
  };
  const addFiles=async files=>{
@@ -489,7 +503,7 @@ function openCardForm(id=''){
    const img=demo?await resize(file):URL.createObjectURL(file);
    if(!demo)previewUrls.add(img);
    if(single){entries[0].image=img;entries[0].file=demo?null:file;}
-   else entries.push({key:uuid(),id:'',code:'',chara:filter||'',image:img,file:demo?null:file});
+   else entries.push({key:uuid(),id:'',code:'',chara:filter||'',mikuko:false,image:img,file:demo?null:file});
   }catch(err){toast(err.message);}}
   if(zone.isConnected)zone.classList.remove('upload-busy');
   paint();$('#upload-entries [data-code]')?.focus();
@@ -511,6 +525,7 @@ function openCardForm(id=''){
  const valid=entries.map(row=>({...row,code:String(row.code||'').trim(),chara:String(row.chara||'').trim()}));
  if(!valid.length){toast('画像を追加してください');return;}
  if(valid.some(row=>!row.code||!chars.includes(row.chara))){toast('コーデ名とサイトAのキャラ名を入力してください');return;}
+ if(valid.some(row=>row.mikuko&&row.code.length>117)){toast('ミクコにチェックしたコーデ名は117文字以内で入力してください');return;}
  submitting=true;
  cardSubmissionInProgress=true;
  const button=$('#card-submit-actions button[type="submit"]');
@@ -536,14 +551,14 @@ function openCardForm(id=''){
   }
   const now=new Date().toISOString();
   for(const row of valid){
-   const card={id:row.id||uuid(),code:row.code,chara:row.chara,image_url:row.image,updated_at:now};
+   const card={id:row.id||uuid(),code:siteAMikukoEncode(row.code,!!row.mikuko),chara:row.chara,image_url:row.image,updated_at:now};
    const old=db.cards.find(c=>c.id===row.id);
    if(old)Object.assign(old,card);
    else db.cards.push(card);
   }
   db.lastCardsUpdated=now;
   // Avoid rebuilding every image when only an existing card's labels changed.
-  if(single&&fileRows.length===0&&!filter&&!q){
+  if(single&&fileRows.length===0&&!filter&&!q&&!mikukoOnly){
    const card=valid[0];
    const entry=$$('[data-edit]').find(b=>b.dataset.edit==='cards:'+card.id)?.closest('.admin-card');
    if(entry){
