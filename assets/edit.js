@@ -446,18 +446,36 @@ function openCardForm(id=''){
  const defaultChara=existing?.chara||filter||'';
  let entries=existing?[{key:uuid(),id:existing.id,code:existing.code||'',chara:defaultChara,image:existing.image_url||''}]:[];
  const single=!!existing,demo=S.isDemo();
- let submitting=false;
+ let submitting=false,copyFirstChara=false;
  const previewUrls=new Set();
  const closeCard=()=>{root._siteACardSuggestionsAbort?.abort();for(const u of previewUrls)URL.revokeObjectURL(u);previewUrls.clear();closeForm();};
  const fileInput='<input id="card-files" type="file" accept="image/png,image/jpeg,image/webp,image/gif" '+(single?'':'multiple')+' hidden>'; 
  const urlMode='';
- $('#dialog-host').innerHTML=`<div class="dialog-shade" id="dialog-shade"><section class="dialog card-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><div class="row between dialog-heading"><h2 id="dialog-title">${single?'フレカを編集':'フレカを追加'}</h2><button class="dialog-x" id="dialog-close" type="button" aria-label="閉じる">×</button></div><form id="card-form"><div class="card-upload-zone" id="upload-zone" role="button" tabindex="0"><span class="upload-symbol">＋</span><strong>画像を選択</strong><span class="upload-hint">またはここにドロップ</span></div>${fileInput}${urlMode}<div id="upload-entries" class="upload-entries"></div><div class="dialog-actions ${single?'':'hidden'}" id="card-submit-actions"><button class="btn primary" type="submit">保存</button></div></form></section></div>`;
+ $('#dialog-host').innerHTML=`<div class="dialog-shade" id="dialog-shade"><section class="dialog card-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><div class="row between dialog-heading"><h2 id="dialog-title">${single?'フレカを編集':'フレカを追加'}</h2><button class="dialog-x" id="dialog-close" type="button" aria-label="閉じる">×</button></div><form id="card-form"><div class="card-upload-zone" id="upload-zone" role="button" tabindex="0"><span class="upload-symbol">＋</span><strong>画像を選択</strong><span class="upload-hint">またはここにドロップ</span></div>${fileInput}${urlMode}<label id="site-a-chara-copy-row" class="card-chara-bulk hidden"><input type="checkbox" id="site-a-chara-copy">一番上のキャラ名を全てのキャラ名欄に反映する</label><div id="upload-entries" class="upload-entries"></div><div class="dialog-actions ${single?'':'hidden'}" id="card-submit-actions"><button class="btn primary" type="submit">保存</button></div></form></section></div>`;
  const root=$('#dialog-host');
+ const syncFirstChara=()=>{
+  if(!copyFirstChara||entries.length<2)return;
+  const first=entries[0].chara;
+  for(let i=1;i<entries.length;i++)entries[i].chara=first;
+  $('#upload-entries')?.querySelectorAll('input[data-chara]').forEach((input,i)=>{if(i>0)input.value=first;});
+ };
  const paint=()=>{
-  $('#upload-entries').innerHTML=entries.map((row,i)=>`<div class="upload-entry" data-entry="${esc(row.key)}"><div class="upload-thumb">${row.image?`<img src="${esc(row.image)}" alt="画像プレビュー">`:'<span>画像なし</span>'}</div><div class="upload-fields"><input data-code="${esc(row.key)}" maxlength="120" aria-label="${i+1}件目のコーデ名" placeholder="コーデ名" value="${esc(row.code)}" required><input type="text" data-chara="${esc(row.key)}" aria-label="${i+1}件目のキャラ名" placeholder="キャラ名" maxlength="120" value="${esc(row.chara)}" required></div>${!single&&entries.length>1?`<button type="button" data-remove-entry="${esc(row.key)}" class="upload-remove" aria-label="${i+1}件目を削除">×</button>`:''}</div>`).join('');
+  if(entries.length<2)copyFirstChara=false;
+  $('#upload-entries').innerHTML=entries.map((row,i)=>`<div class="upload-entry" data-entry="${esc(row.key)}"><div class="upload-thumb">${row.image?`<img src="${esc(row.image)}" alt="画像プレビュー">`:'<span>画像なし</span>'}</div><div class="upload-fields"><input type="text" data-chara="${esc(row.key)}" aria-label="${i+1}件目のキャラ名" placeholder="キャラ名" maxlength="120" value="${esc(row.chara)}" required><input data-code="${esc(row.key)}" maxlength="120" aria-label="${i+1}件目のコーデ名" placeholder="コーデ名" value="${esc(row.code)}" required></div>${!single&&entries.length>1?`<button type="button" data-remove-entry="${esc(row.key)}" class="upload-remove" aria-label="${i+1}件目を削除">×</button>`:''}</div>`).join('');
+  const bulkRow=$('#site-a-chara-copy-row'),bulkCheck=$('#site-a-chara-copy');
+  bulkRow.classList.toggle('hidden',single||entries.length<2);
+  bulkCheck.checked=copyFirstChara;
+  bulkCheck.onchange=()=>{copyFirstChara=bulkCheck.checked;syncFirstChara();};
+  syncFirstChara();
   $('#card-submit-actions').classList.toggle('hidden',entries.length===0);
-  $$('[data-code]',root).forEach(el=>el.addEventListener('input',()=>{const row=entries.find(x=>x.key===el.dataset.code);if(row)row.code=el.value;}));
-  $$('[data-chara]',root).forEach(el=>el.addEventListener('input',()=>{const row=entries.find(x=>x.key===el.dataset.chara);if(row)row.chara=el.value;}));
+  $('[data-code]',root).forEach(el=>el.addEventListener('input',()=>{const row=entries.find(x=>x.key===el.dataset.code);if(row)row.code=el.value;}));
+  $('[data-chara]',root).forEach((el,i)=>el.addEventListener('input',()=>{
+   const row=entries.find(x=>x.key===el.dataset.chara);if(row)row.chara=el.value;
+   if(copyFirstChara){
+    if(i===0)syncFirstChara();
+    else{copyFirstChara=false;bulkCheck.checked=false;}
+   }
+  }));
   $$('[data-remove-entry]',root).forEach(b=>b.onclick=()=>{entries=entries.filter(x=>x.key!==b.dataset.removeEntry);paint();});
   setupSiteACardSuggestions(root,entries);
  };
