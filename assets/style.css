@@ -1087,3 +1087,12 @@ body[data-page="edit"] .admin-card-grid .admin-sub {
 body[data-page="edit"] .admin-card-grid .admin-card-body > .row {
  margin-top:auto;
 }
+
+/* Mobile search input: same compact text treatment as Site B. */
+@media (max-width:699px) {
+ body[data-page="view"] .site-a-public-search-row > .search input[type="search"],
+ body[data-page="edit"] .site-a-mikuko-search-row > .search input[type="search"] {
+  font-size:20px;
+  -webkit-text-size-adjust:100%;
+ }
+}
