@@ -558,34 +558,98 @@ function openCardForm(id=''){
  const closeCard=()=>{root._siteACardSuggestionsAbort?.abort();for(const u of previewUrls)URL.revokeObjectURL(u);previewUrls.clear();closeForm();};
  const fileInput='<input id="card-files" type="file" accept="image/png,image/jpeg,image/webp,image/gif" '+(single?'':'multiple')+' hidden>'; 
  const urlMode='';
- $('#dialog-host').innerHTML=`<div class="dialog-shade" id="dialog-shade"><section class="dialog card-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><div class="row between dialog-heading site-a-card-heading"><h2 id="dialog-title">${single?'フレカを編集':'フレカを追加'}</h2><div class="site-a-card-heading-right">${single?`<label class="site-a-mikuko-check"><input type="checkbox" id="site-a-edit-mikuko" ${entries[0].mikuko?'checked':''}>ミクコ</label>`:''}<button class="dialog-x" id="dialog-close" type="button" aria-label="閉じる">×</button></div></div><form id="card-form"><div class="card-upload-zone" id="upload-zone" role="button" tabindex="0"><span class="upload-symbol">＋</span><strong>画像を選択</strong><span class="upload-hint">またはここにドロップ</span></div>${fileInput}${urlMode}<label id="site-a-chara-copy-row" class="card-chara-bulk hidden"><input type="checkbox" id="site-a-chara-copy">一番上のキャラ名を全てのキャラ名欄に反映する</label><div id="upload-entries" class="upload-entries"></div><div class="dialog-actions ${single?'':'hidden'}" id="card-submit-actions"><button class="btn primary" type="submit">保存</button></div></form></section></div>`;
+ $('#dialog-host').innerHTML=`<div class="dialog-shade" id="dialog-shade"><section class="dialog card-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><div class="row between dialog-heading site-a-card-heading"><h2 id="dialog-title">${single?'フレカを編集':'フレカを追加'}</h2><div class="site-a-card-heading-right">${single?`<label class="site-a-mikuko-check"><input type="checkbox" id="site-a-edit-mikuko" ${entries[0].mikuko?'checked':''}>ミクコ</label>`:''}<button class="dialog-x" id="dialog-close" type="button" aria-label="閉じる">×</button></div></div><form id="card-form"><div class="card-upload-zone" id="upload-zone" role="button" tabindex="0"><span class="upload-symbol">＋</span><strong>画像を選択</strong><span class="upload-hint">またはここにドロップ</span></div>${fileInput}${urlMode}<label id="site-a-chara-copy-row" class="card-chara-bulk hidden"><input type="checkbox" id="site-a-chara-copy">一番上のキャラ名を全てのキャラ名欄に反映する</label><div id="upload-entries" class="upload-entries"></div><div class="dialog-actions ${single?'':'hidden'}" id="card-submit-actions"><button class="btn primary" type="submit">保存</button></div></form></section></div>
+ <div class="overlay hidden" id="site-a-duplicates-modal" role="dialog" aria-modal="true" aria-label="同一フレカ一覧">
+  <section class="site-a-duplicates-panel">
+   <div class="site-a-duplicates-heading"><strong id="site-a-duplicates-title">同一フレカ</strong><button type="button" class="site-a-duplicates-close" id="site-a-duplicates-close" aria-label="閉じる">×</button></div>
+   <div class="site-a-duplicates-grid" id="site-a-duplicates-grid"></div>
+  </section>
+ </div>
+ <div class="overlay hidden" id="site-a-duplicate-zoom" role="dialog" aria-modal="true" aria-label="同一フレカの拡大">
+  <img id="site-a-duplicate-zoom-image" alt="同一フレカの拡大">
+  <button type="button" class="overlay-close" id="site-a-duplicate-zoom-close" aria-label="閉じる">×</button>
+ </div>`;
  const root=$('#dialog-host');
+ const duplicatesModal=$('#site-a-duplicates-modal',root);
+ const duplicatesGrid=$('#site-a-duplicates-grid',root);
+ const zoom=$('#site-a-duplicate-zoom',root);
+ const zoomImage=$('#site-a-duplicate-zoom-image',root);
+ const closeDuplicateZoom=()=>{zoom.classList.add('hidden');zoomImage.removeAttribute('src');};
+ const closeDuplicates=()=>{closeDuplicateZoom();duplicatesModal.classList.add('hidden');duplicatesGrid.innerHTML='';};
+ $('#site-a-duplicates-close',root).onclick=closeDuplicates;
+ $('#site-a-duplicate-zoom-close',root).onclick=closeDuplicateZoom;
+ duplicatesModal.onclick=e=>{if(e.target===duplicatesModal)closeDuplicates();};
+ zoom.onclick=e=>{if(e.target===zoom)closeDuplicateZoom();};
+ root.addEventListener('keydown',e=>{
+  if(e.key!=='Escape')return;
+  if(!zoom.classList.contains('hidden')){e.stopPropagation();closeDuplicateZoom();}
+  else if(!duplicatesModal.classList.contains('hidden')){e.stopPropagation();closeDuplicates();}
+ });
+ const duplicateMatches=row=>{
+  const chara=norm(String(row.chara||'').trim());
+  const code=norm(String(row.code||'').trim());
+  if(!chara||!code)return [];
+  return db.cards.filter(card=>norm(String(card.chara||'').trim())===chara
+   && norm(siteAMikukoCode(card.code))===code
+   && siteAMikukoFlag(card.code)===!!row.mikuko);
+ };
+ const refreshDuplicates=()=>{
+  if(single)return;
+  for(const row of entries){
+   const button=$('[data-duplicate="'+row.key+'"]',root);
+   if(!button)continue;
+   const count=duplicateMatches(row).length;
+   button.textContent='同一:'+count+'件';
+   button.disabled=count===0;
+   button.setAttribute('aria-label',count?'一致する登録済みフレカ '+count+'件を表示':'一致する登録済みフレカはありません');
+  }
+ };
+ const showDuplicates=key=>{
+  const row=entries.find(x=>x.key===key);
+  if(!row)return;
+  const matches=duplicateMatches(row);
+  if(!matches.length)return;
+  $('#site-a-duplicates-title',root).textContent='同一フレカ '+matches.length+'件';
+  duplicatesGrid.innerHTML=matches.map((card,i)=>`<button type="button" class="site-a-duplicate-image" data-duplicate-image="${i}" aria-label="${esc(card.chara+' '+siteAMikukoCode(card.code))}の画像を拡大">${card.image_url?`<img src="${esc(card.image_url)}" alt="${esc(siteAMikukoCode(card.code))}" loading="lazy">`:'<span>画像なし</span>'}</button>`).join('');
+  $('[data-duplicate-image]',duplicatesGrid).forEach(button=>button.onclick=()=>{
+   const card=matches[Number(button.dataset.duplicateImage)];
+   if(!card?.image_url)return;
+   zoomImage.src=card.image_url;
+   zoom.classList.remove('hidden');
+  });
+  duplicatesModal.classList.remove('hidden');
+ };
  const syncFirstChara=()=>{
   if(!copyFirstChara||entries.length<2)return;
   const first=entries[0].chara;
   for(let i=1;i<entries.length;i++)entries[i].chara=first;
   $('#upload-entries')?.querySelectorAll('input[data-chara]').forEach((input,i)=>{if(i>0)input.value=first;});
+  refreshDuplicates();
  };
  const paint=()=>{
   if(entries.length<2)copyFirstChara=false;
-  $('#upload-entries').innerHTML=entries.map((row,i)=>`<div class="upload-entry" data-entry="${esc(row.key)}"><div class="upload-thumb">${row.image?`<img src="${esc(row.image)}" alt="画像プレビュー">`:'<span>画像なし</span>'}</div><div class="upload-fields"><input type="text" data-chara="${esc(row.key)}" aria-label="${i+1}件目のキャラ名" placeholder="キャラ名" maxlength="120" value="${esc(row.chara)}" required><input data-code="${esc(row.key)}" maxlength="120" aria-label="${i+1}件目のコーデ名" placeholder="コーデ名" value="${esc(row.code)}" required></div>${!single?`<label class="site-a-mikuko-check site-a-upload-mikuko"><input type="checkbox" data-mikuko="${esc(row.key)}" ${row.mikuko?'checked':''}>ミクコ</label>`:''}${!single&&entries.length>1?`<button type="button" data-remove-entry="${esc(row.key)}" class="upload-remove" aria-label="${i+1}件目を削除">×</button>`:''}</div>`).join('');
+  $('#upload-entries').innerHTML=entries.map((row,i)=>`<div class="upload-entry" data-entry="${esc(row.key)}"><div class="upload-thumb">${row.image?`<img src="${esc(row.image)}" alt="画像プレビュー">`:'<span>画像なし</span>'}</div><div class="upload-fields"><input type="text" data-chara="${esc(row.key)}" aria-label="${i+1}件目のキャラ名" placeholder="キャラ名" maxlength="120" value="${esc(row.chara)}" required><input data-code="${esc(row.key)}" maxlength="120" aria-label="${i+1}件目のコーデ名" placeholder="コーデ名" value="${esc(row.code)}" required></div>${!single?`<div class="site-a-upload-tags"><label class="site-a-mikuko-check site-a-upload-mikuko"><input type="checkbox" data-mikuko="${esc(row.key)}" ${row.mikuko?'checked':''}>ミクコ</label><button type="button" class="site-a-duplicate-count" data-duplicate="${esc(row.key)}" disabled>同一:0件</button></div>`:''}${!single&&entries.length>1?`<button type="button" data-remove-entry="${esc(row.key)}" class="upload-remove" aria-label="${i+1}件目を削除">×</button>`:''}</div>`).join('');
   const bulkRow=$('#site-a-chara-copy-row'),bulkCheck=$('#site-a-chara-copy');
   bulkRow.classList.toggle('hidden',single||entries.length<2);
   bulkCheck.checked=copyFirstChara;
-  bulkCheck.onchange=()=>{copyFirstChara=bulkCheck.checked;syncFirstChara();};
+  bulkCheck.onchange=()=>{copyFirstChara=bulkCheck.checked;syncFirstChara();refreshDuplicates();};
   syncFirstChara();
+  refreshDuplicates();
   $('#card-submit-actions').classList.toggle('hidden',entries.length===0);
-  $$('[data-code]',root).forEach(el=>el.addEventListener('input',()=>{const row=entries.find(x=>x.key===el.dataset.code);if(row)row.code=el.value;}));
+  $('[data-duplicate]',root).forEach(el=>el.onclick=()=>showDuplicates(el.dataset.duplicate));
+  $('[data-code]',root).forEach(el=>el.addEventListener('input',()=>{const row=entries.find(x=>x.key===el.dataset.code);if(row)row.code=el.value;refreshDuplicates();}));
   $$('[data-chara]',root).forEach((el,i)=>el.addEventListener('input',()=>{
    const row=entries.find(x=>x.key===el.dataset.chara);if(row)row.chara=el.value;
    if(copyFirstChara){
     if(i===0)syncFirstChara();
     else{copyFirstChara=false;bulkCheck.checked=false;}
    }
+   refreshDuplicates();
   }));
   $$('[data-mikuko]',root).forEach(el=>el.onchange=()=>{
    const row=entries.find(x=>x.key===el.dataset.mikuko);
    if(row)row.mikuko=el.checked;
+   refreshDuplicates();
   });
   const editMikuko=$('#site-a-edit-mikuko');
   if(single&&editMikuko)editMikuko.onchange=()=>{entries[0].mikuko=editMikuko.checked;};
