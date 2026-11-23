@@ -611,7 +611,7 @@ function openCardForm(id=''){
   if(!matches.length)return;
   $('#site-a-duplicates-title',root).textContent='同一フレカ '+matches.length+'件';
   duplicatesGrid.innerHTML=matches.map((card,i)=>`<button type="button" class="site-a-duplicate-image" data-duplicate-image="${i}" aria-label="${esc(card.chara+' '+siteAMikukoCode(card.code))}の画像を拡大">${card.image_url?`<img src="${esc(card.image_url)}" alt="${esc(siteAMikukoCode(card.code))}" loading="lazy">`:'<span>画像なし</span>'}</button>`).join('');
-  $('[data-duplicate-image]',duplicatesGrid).forEach(button=>button.onclick=()=>{
+  $$('[data-duplicate-image]',duplicatesGrid).forEach(button=>button.onclick=()=>{
    const card=matches[Number(button.dataset.duplicateImage)];
    if(!card?.image_url)return;
    zoomImage.src=card.image_url;
@@ -636,8 +636,8 @@ function openCardForm(id=''){
   syncFirstChara();
   refreshDuplicates();
   $('#card-submit-actions').classList.toggle('hidden',entries.length===0);
-  $('[data-duplicate]',root).forEach(el=>el.onclick=()=>showDuplicates(el.dataset.duplicate));
-  $('[data-code]',root).forEach(el=>el.addEventListener('input',()=>{const row=entries.find(x=>x.key===el.dataset.code);if(row)row.code=el.value;refreshDuplicates();}));
+  $$('[data-duplicate]',root).forEach(el=>el.onclick=()=>showDuplicates(el.dataset.duplicate));
+  $$('[data-code]',root).forEach(el=>el.addEventListener('input',()=>{const row=entries.find(x=>x.key===el.dataset.code);if(row)row.code=el.value;refreshDuplicates();}));
   $$('[data-chara]',root).forEach((el,i)=>el.addEventListener('input',()=>{
    const row=entries.find(x=>x.key===el.dataset.chara);if(row)row.chara=el.value;
    if(copyFirstChara){
