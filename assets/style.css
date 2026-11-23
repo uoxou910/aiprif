@@ -1263,3 +1263,15 @@ body[data-page="edit"] #site-a-duplicate-zoom {z-index:110;}
  body[data-page="edit"] .card-entry-dialog .site-a-duplicate-count {font-size:11px;}
  body[data-page="edit"] #site-a-duplicates-modal .site-a-duplicates-panel {padding:15px;}
 }
+
+/* Larger admin card previews on desktop; leave mobile and touch layouts unchanged. */
+@media (min-width:900px) and (hover:hover) and (pointer:fine) {
+ body[data-page="edit"] #picture-modal > img,
+ body[data-page="edit"] #site-a-duplicate-zoom > img {
+  width:min(780px,calc(100vw - 40px));
+  height:auto;
+  max-width:min(780px,calc(100vw - 40px));
+  max-height:90dvh;
+  object-fit:contain;
+ }
+}
