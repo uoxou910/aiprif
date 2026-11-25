@@ -111,7 +111,7 @@ $('#public-mikuko-only').addEventListener('change',e=>{mikukoOnly=e.target.check
 $('#close').onclick=()=>$('#overlay').classList.add('hidden');$('#overlay').onclick=e=>{if(e.target.id==='overlay')$('#overlay').classList.add('hidden');};document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#overlay').classList.add('hidden')});
 try{
  const d=await api('public');
- cards=(Array.isArray(d.cards)?d.cards:[]).filter(x=>x&&typeof x.code==='string').map(stripMikuko).filter(x=>!x.hidden);
+ cards=S.newestCards((Array.isArray(d.cards)?d.cards:[]).filter(x=>x&&typeof x.code==='string').map(stripMikuko).filter(x=>!x.hidden));
  if(d.colors&&typeof d.colors==='object'){
   const fresh={...S.DEFAULT_COLORS,...d.colors};
   if(JSON.stringify(colors)!==JSON.stringify(fresh)){
