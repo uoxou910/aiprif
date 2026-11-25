@@ -21,8 +21,16 @@ function themeMain(value,fallback){return colorSpec(value,fallback).first;}
 
 const validChara=s=>chars.includes(s);
 const base=()=>({cards:[],owned:[],ownedImages:{},plans:[],colors:{...DEFAULT_COLORS},lastCardsUpdated:'',lastSavedAt:''});
+// Display newest registrations first without changing the stored card order.
+function newestCards(rows){
+ return rows.map((card,index)=>{
+  const created=Date.parse(card.created_at||'');
+  const updated=Date.parse(card.updated_at||'');
+  return {card,index,time:Number.isFinite(created)?created:Number.isFinite(updated)?updated:0};
+ }).sort((a,b)=>b.time-a.time||b.index-a.index).map(entry=>entry.card);
+}
 function sanitize(obj){const out=base();if(!obj||typeof obj!=='object')return out;
- for(const key of ['cards','owned','plans'])if(Array.isArray(obj[key]))out[key]=obj[key].filter(x=>x&&typeof x.code==='string'&&validChara(x.chara)).map(x=>({id:String(x.id||uuid()),code:x.code.trim().slice(0,120),chara:x.chara,...(key==='cards'?{image_url:typeof x.image_url==='string'?x.image_url:'',updated_at:typeof x.updated_at==='string'?x.updated_at:''}:{}),...(key==='plans'?{note:String(x.note||'').slice(0,600),done:!!x.done}:{})})).filter(x=>x.code);
+ for(const key of ['cards','owned','plans'])if(Array.isArray(obj[key]))out[key]=obj[key].filter(x=>x&&typeof x.code==='string'&&validChara(x.chara)).map(x=>({id:String(x.id||uuid()),code:x.code.trim().slice(0,120),chara:x.chara,...(key==='cards'?{image_url:typeof x.image_url==='string'?x.image_url:'',updated_at:typeof x.updated_at==='string'?x.updated_at:'',...(typeof x.created_at==='string'&&x.created_at?{created_at:x.created_at}:{})}:{}),...(key==='plans'?{note:String(x.note||'').slice(0,600),done:!!x.done}:{})})).filter(x=>x.code);
  if(obj.ownedImages&&typeof obj.ownedImages==='object'&&!Array.isArray(obj.ownedImages)){
   for(const [key,image] of Object.entries(obj.ownedImages)){
    if(typeof key==='string'&&key.length<=120&&typeof image==='string'&&(/^(?:data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+)$/.test(image)&&image.length<=38000||/^idb:[A-Za-z0-9_-]{6,100}$/.test(image)))out.ownedImages[key]=image;
@@ -48,7 +56,7 @@ async function api(action,payload={},token=''){const url=window.SITE_D_CONFIG.ga
   if(j.ok===false)throw Error(j.error||'公開データの取得に失敗しました');
   const rows=Array.isArray(j)?j:(Array.isArray(j.cards)?j.cards:[]);
   const cards=rows.filter(x=>x&&x.visible!==false&&validChara(x.chara)&&typeof x.code==='string')
-   .map(x=>({id:String(x.id||uuid()),code:x.code,chara:x.chara,image_url:String(x.image_url||''),updated_at:String(x.updated_at||x.created_at||'')}));
+   .map(x=>({id:String(x.id||uuid()),code:x.code,chara:x.chara,image_url:String(x.image_url||''),updated_at:String(x.updated_at||x.created_at||''),...(x.created_at?{created_at:String(x.created_at)}:{})}));
   const stamp=cards.map(x=>Date.parse(x.updated_at)).filter(Number.isFinite);
   return {cards,colors:{...DEFAULT_COLORS},lastCardsUpdated:stamp.length?new Date(Math.max(...stamp)).toISOString():''};
  }
@@ -118,5 +126,5 @@ function buildCharacterNav(onSelect,{mobile=true,colors=DEFAULT_COLORS}={}){
   return {set(c){current=c;update();},updateColors(c){colors=c;update();}};
  }};}
 function toast(msg){let n=$('#toast');if(!n){n=document.createElement('div');n.id='toast';n.className='toast';document.body.appendChild(n);}n.textContent=msg;n.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>n.classList.remove('show'),2300);}
-window.SiteD={colorSpec,themeBackground,themeMain,colorInfo,characterStyle,groups,chars,DEFAULT_COLORS,$,$$,esc,norm,uuid,cleanColor,validChara,base,sanitize,localRead,localSave,isDemo,api,theme,cardImage,buildCharacterNav,toast,publicData};
+window.SiteD={colorSpec,themeBackground,themeMain,colorInfo,characterStyle,groups,chars,DEFAULT_COLORS,$,$$,esc,norm,uuid,cleanColor,validChara,base,sanitize,newestCards,localRead,localSave,isDemo,api,theme,cardImage,buildCharacterNav,toast,publicData};
 })();
