@@ -1327,3 +1327,24 @@ body[data-page="edit"] #site-a-duplicate-zoom {z-index:110;}
   padding-top:8px;
  }
 }
+
+/* Keep the modal centered inside the visible keyboard-safe area, not the backdrop. */
+@media (max-width:699px) {
+ body[data-page="edit"] #dialog-shade .card-entry-dialog {
+  position:absolute;
+  top:calc(var(--upload-visible-top,20px) + var(--upload-visible-height,calc(100dvh - 40px)) / 2);
+  left:50%;
+  transform:translate(-50%,-50%);
+  animation:none;
+  width:min(620px,calc(100% - 40px));
+  max-height:var(--upload-visible-height,calc(100dvh - 40px));
+ }
+ body[data-page="edit"]:has(#dialog-shade .card-entry-dialog) {
+  overflow:hidden;
+  overscroll-behavior:none;
+ }
+ body[data-page="edit"] #dialog-shade .upload-entries {
+  overflow-anchor:none;
+  scroll-behavior:auto;
+ }
+}
