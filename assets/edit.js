@@ -467,7 +467,7 @@ function setupSiteACardSuggestions(root,entries){
   root.appendChild(popup);
  }
  popup.hidden=true;popup.innerHTML='';
- let field=null,matched=[],selected=-1;
+ let field=null,matched=[],selected=-1,applyingSuggestion=false;
  const hide=()=>{
   popup.hidden=true;popup.innerHTML='';matched=[];selected=-1;
   if(field){field.setAttribute('aria-expanded','false');field.removeAttribute('aria-activedescendant');}
@@ -502,8 +502,12 @@ function setupSiteACardSuggestions(root,entries){
  const pick=value=>{
   const input=field;
   if(!input?.isConnected)return hide();
-  input.value=value;
-  input.dispatchEvent(new Event('input',{bubbles:true}));
+  applyingSuggestion=true;
+  try{
+   if(document.activeElement!==input)input.focus({preventScroll:true});
+   input.value=value;
+   input.dispatchEvent(new Event('input',{bubbles:true}));
+  }finally{applyingSuggestion=false;}
   if(document.activeElement!==input)input.focus({preventScroll:true});
   input.setSelectionRange(value.length,value.length);
   hide();
@@ -524,8 +528,26 @@ function setupSiteACardSuggestions(root,entries){
   popup.hidden=false;
   input.setAttribute('aria-expanded','true');
   $$('[data-suggestion]',popup).forEach(button=>{
-   button.onmousedown=e=>e.preventDefault();
-   button.onclick=()=>pick(matched[Number(button.dataset.suggestion)]);
+   button.tabIndex=-1;
+   // Select on a touch tap before Safari transfers focus to the button.
+   let touch=null;
+   button.addEventListener('touchstart',e=>{
+    if(e.touches.length!==1){touch=null;return;}
+    const t=e.touches[0];touch={x:t.clientX,y:t.clientY,id:t.identifier};
+   },{passive:true});
+   button.addEventListener('touchmove',e=>{
+    const t=e.touches[0];
+    if(touch&&(!t||Math.abs(t.clientX-touch.x)>8||Math.abs(t.clientY-touch.y)>8))touch=null;
+   },{passive:true});
+   button.addEventListener('touchcancel',()=>{touch=null;});
+   button.addEventListener('touchend',e=>{
+    if(!touch||!Array.from(e.changedTouches).some(t=>t.identifier===touch.id)){touch=null;return;}
+    touch=null;
+    if(e.cancelable)e.preventDefault();
+    pick(matched[Number(button.dataset.suggestion)]);
+   },{passive:false});
+   button.addEventListener('mousedown',e=>e.preventDefault());
+   button.addEventListener('click',()=>pick(matched[Number(button.dataset.suggestion)]));
   });
   place();
  };
@@ -545,8 +567,8 @@ function setupSiteACardSuggestions(root,entries){
   input.setAttribute('aria-controls',popup.id);
   input.setAttribute('aria-expanded','false');
   input.autocomplete='off';
-  input.addEventListener('input',()=>show(input));
-  input.addEventListener('focus',()=>show(input));
+  input.addEventListener('input',()=>{if(!applyingSuggestion)show(input);});
+  input.addEventListener('focus',()=>{if(!applyingSuggestion)show(input);});
   input.addEventListener('keydown',e=>{
    if(e.isComposing||e.keyCode===229||field!==input||popup.hidden)return;
    if(e.key==='ArrowDown'||e.key==='ArrowUp'){
