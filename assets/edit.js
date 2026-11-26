@@ -475,17 +475,23 @@ function setupSiteACardSuggestions(root,entries){
  const place=()=>{
   if(popup.hidden||!field?.isConnected)return;
   const rect=field.getBoundingClientRect();
-  popup.style.left=Math.max(8,rect.left)+'px';
+  const vv=window.visualViewport;
+  const bottom=vv?vv.offsetTop+vv.height:window.innerHeight;
+  popup.style.left=rect.left+'px';
   popup.style.top=(rect.bottom+4)+'px';
-  popup.style.width=Math.min(rect.width,innerWidth-16)+'px';
-  popup.style.maxHeight=Math.max(40,Math.min(214,innerHeight-rect.bottom-14))+'px';
+  popup.style.width=rect.width+'px';
+  popup.style.maxHeight=Math.max(36,Math.min(214,bottom-rect.bottom-8))+'px';
+  // Correct browser-specific fixed-position offsets after keyboard/viewport movement.
+  const actual=popup.getBoundingClientRect();
+  popup.style.left=(rect.left+(rect.left-actual.left))+'px';
+  popup.style.top=(rect.bottom+4+(rect.bottom+4-actual.top))+'px';
  };
  const pick=value=>{
   const input=field;
   if(!input?.isConnected)return hide();
   input.value=value;
   input.dispatchEvent(new Event('input',{bubbles:true}));
-  input.focus({preventScroll:true});
+  if(document.activeElement!==input)input.focus({preventScroll:true});
   input.setSelectionRange(value.length,value.length);
   hide();
  };
@@ -515,7 +521,8 @@ function setupSiteACardSuggestions(root,entries){
    const on=i===selected;
    button.classList.toggle('is-active',on);
    button.setAttribute('aria-selected',String(on));
-   if(on){field.setAttribute('aria-activedescendant',button.id);button.scrollIntoView({block:'nearest'});}
+   if(on){field.setAttribute('aria-activedescendant',button.id);if(button.offsetTop<popup.scrollTop)popup.scrollTop=button.offsetTop;
+    else if(button.offsetTop+button.offsetHeight>popup.scrollTop+popup.clientHeight)popup.scrollTop=button.offsetTop+button.offsetHeight-popup.clientHeight;}
   });
   if(selected<0)field.removeAttribute('aria-activedescendant');
  };
@@ -545,6 +552,28 @@ function setupSiteACardSuggestions(root,entries){
  root.addEventListener('scroll',reposition,{passive:true,capture:true,signal:controller.signal});
  window.addEventListener('scroll',reposition,{passive:true,signal:controller.signal});
  window.addEventListener('resize',reposition,{passive:true,signal:controller.signal});
+ const vv=window.visualViewport;
+ let frame=0;
+ const followViewport=()=>{
+  cancelAnimationFrame(frame);
+  frame=requestAnimationFrame(()=>{
+   if(controller.signal.aborted)return;
+   const shade=root.querySelector('.dialog-shade');
+   if(shade&&vv&&matchMedia('(max-width:699px)').matches){
+    shade.style.top=vv.offsetTop+'px';
+    shade.style.bottom='auto';
+    shade.style.height=vv.height+'px';
+    const dialog=shade.querySelector('.card-entry-dialog');
+    if(dialog)dialog.style.maxHeight=Math.max(0,vv.height-40)+'px';
+   }
+   reposition();
+  });
+ };
+ vv?.addEventListener('resize',followViewport,{passive:true,signal:controller.signal});
+ vv?.addEventListener('scroll',followViewport,{passive:true,signal:controller.signal});
+ root.addEventListener('focusin',followViewport,{signal:controller.signal});
+ followViewport();
+ controller.signal.addEventListener('abort',()=>cancelAnimationFrame(frame),{once:true});
 }
 
 function openCardForm(id=''){
