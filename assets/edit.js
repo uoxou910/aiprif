@@ -603,7 +603,7 @@ function openCardForm(id=''){
   const close=$('#dialog-close');
   close.textContent='‹';
   close.setAttribute('aria-label','フレカ一覧に戻る');
-  window.scrollTo(0,0);
+  window.scrollTo({top:0,behavior:'instant'});
  }
 
  const duplicatesModal=$('#site-a-duplicates-modal',root);
@@ -705,7 +705,7 @@ function openCardForm(id=''){
    else entries.push({key:uuid(),id:'',code:'',chara:filter||'',mikuko:false,hidden:false,image:img,file:demo?null:file});
   }catch(err){toast(err.message);}}
   if(zone.isConnected)zone.classList.remove('upload-busy');
-  paint();$('#upload-entries [data-code]')?.focus();
+  paint();if(!mobilePage)$('#upload-entries [data-code]')?.focus();
  };
  $('#dialog-close').onclick=closeCard;
  $('#dialog-shade').onclick=e=>{if(e.target.id==='dialog-shade')closeCard();};
