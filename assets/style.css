@@ -1292,3 +1292,38 @@ body[data-page="edit"] #site-a-duplicate-zoom {z-index:110;}
   object-fit:contain;
  }
 }
+
+/* Mobile add-card dialog: match search input typography and keep save outside scrolling. */
+@media (max-width:699px) {
+ body[data-page="edit"] #dialog-shade .card-entry-dialog {
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+  max-height:calc(100dvh - 40px);
+  overflow:hidden;
+ }
+ body[data-page="edit"] #dialog-shade .card-entry-dialog .upload-fields input {
+  font-size:20px;
+  -webkit-text-size-adjust:100%;
+ }
+ body[data-page="edit"] #dialog-shade .card-entry-dialog > .dialog-heading {flex:0 0 auto;}
+ body[data-page="edit"] #card-form {
+  display:flex;
+  flex-direction:column;
+  flex:1 1 auto;
+  min-height:0;
+ }
+ body[data-page="edit"] #card-form > :not(#upload-entries) {flex-shrink:0;}
+ body[data-page="edit"] #card-form > #upload-entries {
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  align-content:start;
+ }
+ body[data-page="edit"] #card-submit-actions {
+  flex:0 0 auto;
+  margin-top:12px;
+  padding-top:8px;
+ }
+}
