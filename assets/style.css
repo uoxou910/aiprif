@@ -1348,3 +1348,26 @@ body[data-page="edit"] #site-a-duplicate-zoom {z-index:110;}
   scroll-behavior:auto;
  }
 }
+
+/* Keyboard mode: allocate the visible area to the editable card list. */
+@media (max-width:699px) {
+ body[data-page="edit"] #dialog-shade .card-entry-dialog.upload-keyboard-open {
+  height:var(--upload-visible-height);
+  padding:10px 14px;
+ }
+ body[data-page="edit"] #dialog-shade .upload-keyboard-open .dialog-heading,
+ body[data-page="edit"] #dialog-shade .upload-keyboard-open .card-upload-zone,
+ body[data-page="edit"] #dialog-shade .upload-keyboard-open .card-chara-bulk,
+ body[data-page="edit"] #dialog-shade .upload-keyboard-open .site-b-upload-status {
+  display:none!important;
+ }
+ body[data-page="edit"] #dialog-shade .upload-keyboard-open .upload-entries {
+  margin-top:0;
+  flex:1 1 0;
+  min-height:0;
+ }
+ body[data-page="edit"] #dialog-shade .upload-keyboard-open .dialog-actions {
+  margin-top:4px;
+  padding-top:4px;
+ }
+}
