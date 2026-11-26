@@ -1302,13 +1302,13 @@ body[data-page="edit"] #site-a-duplicate-zoom {z-index:110;}
  }
  body[data-page="edit"] #dialog-shade .card-entry-dialog {
   position:absolute;
-  top:calc(var(--upload-vv-top,0px) + 6px);
+  top:6px;
   left:50%;
   transform:translateX(-50%);
   animation:none;
   width:min(620px,calc(100% - 24px));
-  height:calc(var(--upload-vv-height,100dvh) - 12px);
-  max-height:calc(var(--upload-vv-height,100dvh) - 12px);
+  height:calc(100svh - 12px);
+  max-height:calc(100svh - 12px);
   display:flex;
   flex-direction:column;
   min-height:0;
@@ -1352,7 +1352,8 @@ body[data-page="edit"] #site-a-duplicate-zoom {z-index:110;}
   overscroll-behavior:contain;
   overflow-anchor:none;
   scroll-behavior:auto;
-  scroll-padding-block:8px 56px;
+  scroll-padding-block:8px calc(56px + var(--upload-covered,0px));
+  padding-bottom:var(--upload-covered,0px);
   align-content:start;
   margin-top:4px;
  }
